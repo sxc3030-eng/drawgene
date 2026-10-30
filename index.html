@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>drawGene</title>
+<meta name="description" content="drawGene : dessin technique 2D et 3D, plans de maison, calcul de matériaux. Pensé par un Tech, Eugene.">
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#14315c">
+<link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Mise en page : une feuille de plan bleue — en-tête, procédure d'installation, cartouche en bas à droite */
+:root{
+  --paper:#eef3f9; --ink:#14243d; --line:#9db3cf; --grid:rgba(20,49,92,.07); --accent:#d9861a; --blue:#14315c; --card:#ffffff; --mut:#4f6380;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"Barlow",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--paper:#0e1a2c;--ink:#e3ebf6;--line:#34507a;--grid:rgba(120,170,230,.07);--accent:#ffb020;--blue:#7fb2ff;--card:#13233a;--mut:#93a7c2;color-scheme:dark}}
+:root[data-theme="dark"]{--paper:#0e1a2c;--ink:#e3ebf6;--line:#34507a;--grid:rgba(120,170,230,.07);--accent:#ffb020;--blue:#7fb2ff;--card:#13233a;--mut:#93a7c2;color-scheme:dark}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.55 var(--body);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.sheet{max-width:980px;margin:0 auto;padding-block:32px 40px;display:grid;gap:36px}
+header{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center;border:2px solid var(--blue);padding:22px;background:var(--card)}
+header img{width:88px;height:88px}
+h1{font:700 clamp(48px,9vw,84px)/.9 var(--display);margin:0;letter-spacing:.01em;color:var(--blue)}
+h1 span{color:var(--accent)}
+.tag{margin:8px 0 0;font-size:18px;max-width:60ch;color:var(--mut);text-wrap:balance}
+.actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.btn{font:600 18px var(--body);border:2px solid var(--blue);background:var(--blue);color:var(--paper);padding:14px 22px;cursor:pointer;text-decoration:none;display:inline-flex;gap:10px;align-items:center}
+.btn.ghost{background:transparent;color:var(--blue)}
+.btn:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.btn[hidden]{display:none}
+#state{font:14px var(--mono);color:var(--mut)}
+h2{font:700 28px/1.1 var(--display);margin:0 0 14px;text-transform:uppercase;letter-spacing:.06em;color:var(--blue)}
+.devices{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.dev{background:var(--card);border:1px solid var(--line);padding:18px 20px;min-width:0}
+.dev h3{font:600 20px var(--display);margin:0 0 8px;letter-spacing:.03em}
+.dev ol{margin:0;padding-left:22px;display:grid;gap:4px}
+kbd{font:600 13px var(--mono);border:1px solid var(--line);padding:1px 6px;background:var(--paper)}
+.feats{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0;border-top:1px solid var(--line)}
+.feat{padding:16px 16px 16px 0;border-bottom:1px solid var(--line);min-width:0}
+.feat b{display:block;font:600 19px var(--display);letter-spacing:.03em}
+.feat small{color:var(--mut);font-size:15px}
+.dim{font:13px var(--mono);color:var(--accent)}
+footer{display:flex;justify-content:flex-end}
+.cartouche{border:2px solid var(--blue);background:var(--card);display:grid;grid-template-columns:auto 1fr;font:14px var(--mono);min-width:0;width:min(100%,460px)}
+.cartouche div{padding:7px 12px;border-bottom:1px solid var(--line)}
+.cartouche div:nth-child(odd){border-right:1px solid var(--line);color:var(--mut);text-transform:uppercase;font-size:11px;letter-spacing:.08em;display:flex;align-items:center}
+.cartouche .who{font:700 22px var(--display);color:var(--blue);letter-spacing:.02em}
+.cartouche div:nth-last-child(-n+2){border-bottom:0}
+@media (max-width:560px){header{grid-template-columns:1fr}header img{width:64px;height:64px}}
+@media (prefers-reduced-motion:no-preference){.btn{transition:transform .15s}.btn:hover{transform:translateY(-2px)}}
+</style>
+</head>
+<body>
+<main class="sheet">
+  <header>
+    <img src="icon.svg" alt="">
+    <div>
+      <h1>draw<span>Gene</span></h1>
+      <p class="tag">Le logiciel de dessin technique de la famille : plans de maison avec liste de matériaux, pièces mécaniques en 3D, reconstruction depuis une photo.</p>
+    </div>
+  </header>
+
+  <section class="actions" aria-label="Installer">
+    <button class="btn" id="install" hidden>⬇ Installer drawGene</button>
+    <a class="btn" id="openApp" href="plan.html">Ouvrir drawGene</a>
+    <a class="btn ghost" href="modele3d.html">Ouvrir la 3D</a>
+    <span id="state">Fonctionne aussi sans internet une fois installé.</span>
+  </section>
+
+  <section>
+    <h2>Installer en 1 minute</h2>
+    <div class="devices">
+      <div class="dev"><h3>💻 Ordinateur (Windows / Mac)</h3><ol>
+        <li>Ouvrez cette page dans <b>Chrome</b> ou <b>Edge</b>.</li>
+        <li>Cliquez <b>⬇ Installer drawGene</b> ci-dessus, ou l'icône ⊕ à droite de la barre d'adresse.</li>
+        <li>drawGene apparaît dans le menu Démarrer / le Dock, comme un vrai logiciel.</li></ol></div>
+      <div class="dev"><h3>📱 Android</h3><ol>
+        <li>Ouvrez cette page dans <b>Chrome</b>.</li>
+        <li>Touchez <b>⬇ Installer drawGene</b>, ou le menu <kbd>⋮</kbd> → <b>Installer l'application</b>.</li>
+        <li>L'icône drawGene est ajoutée à l'écran d'accueil.</li></ol></div>
+      <div class="dev"><h3>🍎 iPhone / iPad</h3><ol>
+        <li>Ouvrez cette page dans <b>Safari</b>.</li>
+        <li>Touchez le bouton <b>Partager</b> <kbd>⬆</kbd>.</li>
+        <li>Choisissez <b>Sur l'écran d'accueil</b>, puis <b>Ajouter</b>.</li></ol></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Ce qu'il fait</h2>
+    <div class="feats">
+      <div class="feat"><b>Plans de maison</b><small>Murs, portes, fenêtres, pièces et surfaces en m² et pi².</small> <span class="dim">12000 × 8000 mm</span></div>
+      <div class="feat"><b>Liste de matériaux</b><small>2x4, 2x6, gypse 4×8, isolant, béton, plancher, plinthes, avec le coût total.</small></div>
+      <div class="feat"><b>3D paramétrique</b><small>Extrusion, révolution, trous, motifs. On tourne la pièce et on mesure.</small> <span class="dim">Ø10 ×6</span></div>
+      <div class="feat"><b>Photo → pièce</b><small>Photo de la pièce avec une feuille A4 à côté : contour et trous détectés.</small> <span class="dim">297 × 210</span></div>
+      <div class="feat"><b>Masse et coût</b><small>Acier, inox, alu, laiton, bois, PVC : poids et prix calculés.</small></div>
+      <div class="feat"><b>Compatible</b><small>Ouvre STEP, IGES, STL, OBJ et DXF (Inventor, AutoCAD, SolidWorks).</small></div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="cartouche" aria-label="Cartouche">
+      <div>Projet</div><div>drawGene</div>
+      <div>Pensé par</div><div class="who">un Tech, Eugene</div>
+      <div>Échelle</div><div>1 : 1</div>
+      <div>Feuille</div><div>1 / 1 · Rév. A</div>
+    </div>
+  </footer>
+</main>
+<script>
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+let deferred=null;const btn=document.getElementById('install'),st=document.getElementById('state');
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;btn.hidden=false});
+btn.onclick=async()=>{if(!deferred)return;deferred.prompt();const r=await deferred.userChoice;deferred=null;btn.hidden=true;st.textContent=r.outcome=='accepted'?'✔ drawGene est installé.':'Installation annulée. Vous pouvez réessayer plus tard.'};
+addEventListener('appinstalled',()=>{btn.hidden=true;st.textContent='✔ drawGene est installé.'});
+if(matchMedia('(display-mode: standalone)').matches)location.replace('plan.html');
+</script>
+</body>
+</html>

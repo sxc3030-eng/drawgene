@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#14315c"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes">
+<script>if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{})</script>
+<title>drawGene 3D</title>
+<style>
+:root{--bg:#15171c;--panel:#22252c;--line:#363a44;--txt:#e6e7ea;--acc:#3d8bff;--mut:#9aa0ab}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--txt);font:13px system-ui,sans-serif;overflow:hidden}
+#top{height:46px;display:flex;align-items:center;gap:5px;padding:0 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto}
+#top b{margin-right:6px;white-space:nowrap;font-size:14px}
+button,select,input,textarea{font:inherit;color:var(--txt)}
+button{background:#2f333c;border:1px solid var(--line);border-radius:7px;padding:5px 9px;cursor:pointer;white-space:nowrap}
+button.on{background:var(--acc);border-color:var(--acc)}
+.sep{width:1px;height:26px;background:var(--line);margin:0 4px;flex:none}
+select,input,textarea{background:#1b1d23;border:1px solid var(--line);border-radius:6px;padding:4px 6px;width:100%}
+#main{display:flex;height:calc(100% - 46px)}
+#tree{width:220px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:8px}
+#tree .it{padding:6px 8px;border-radius:6px;cursor:pointer;display:flex;gap:6px;align-items:center;margin-bottom:2px}
+#tree .it:hover{background:#2f333c}#tree .it.sel{background:#3d8bff33;outline:1px solid var(--acc)}
+#tree .it.off{opacity:.45}#tree .sub{margin-left:18px}
+#view{flex:1;position:relative;touch-action:none}
+#view canvas{display:block}
+#vbtn{position:absolute;top:8px;left:8px;display:flex;gap:4px;flex-wrap:wrap}
+#info{position:absolute;left:8px;bottom:8px;background:#000a;padding:6px 10px;border-radius:6px;font:12px monospace;color:#cfd3da;white-space:pre}
+#props{width:280px;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:10px}
+h4{font-size:11px;text-transform:uppercase;color:var(--mut);margin:10px 0 6px}
+.f{display:grid;grid-template-columns:1fr 1.2fr;gap:4px 8px;align-items:center;margin-bottom:5px}
+.note{color:var(--mut);font-size:11px;line-height:1.45;margin-top:6px}
+table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-bottom:1px solid var(--line)}td:last-child{text-align:right}
+@media(max-width:760px){#tree{position:absolute;left:0;top:46px;bottom:0;z-index:5;transform:translateX(-100%);transition:.2s;width:70%}#tree.open{transform:none}
+ #props{position:absolute;right:0;top:46px;bottom:0;z-index:5;transform:translateX(100%);transition:.2s;width:85%}#props.open{transform:none}}
+</style>
+</head>
+<body>
+<div id="top">
+  <b>🧊 drawGene 3D</b>
+  <a href="plan.html"><button>← Plan 2D</button></a>
+  <span class="sep"></span>
+  <button data-add="extrude">⬆ Extrusion</button>
+  <button data-add="revolve">🔄 Révolution</button>
+  <button data-add="hole">🕳 Trou</button>
+  <button data-add="cut">✂ Enlèvement</button>
+  <span class="sep"></span>
+  <button id="houseB">🏠 Maison 3D depuis le plan</button>
+  <span class="sep"></span>
+  <button id="undoB">↶</button><button id="redoB">↷</button>
+  <button id="newB">Nouveau</button><button id="saveB">Enregistrer</button><button id="openB">Ouvrir</button><button id="impB">📥 Importer STEP/IGES/STL/OBJ</button><button id="stlB">Export STL</button><button id="objB">Export OBJ</button><button id="pngB">PNG</button>
+  <button id="treeT">Arbre</button><button id="propT">Param.</button>
+  <input type="file" id="file" accept=".json" hidden><input type="file" id="impF" accept=".step,.stp,.iges,.igs,.stl,.obj,.brep" multiple hidden>
+</div>
+<div id="main">
+  <div id="tree"></div>
+  <div id="view">
+    <div id="vbtn"><button data-v="iso">Iso</button><button data-v="front">Face</button><button data-v="top">Dessus</button><button data-v="right">Droite</button><button id="wireB">Filaire</button><button id="edgeB" class="on">Arêtes</button><button id="fitB">Ajuster</button><button id="measB">📏 Mesurer</button><button id="clrM">Effacer mesures</button></div><div id="labels" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>
+    <div id="info"></div>
+  </div>
+  <div id="props"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const DENS={acier:7850,inox:8000,alu:2700,laiton:8500,cuivre:8960,bois:600,pvc:1400,acrylique:1190,beton:2400};
+const COLORS={acier:0x9aa3ad,inox:0xc8cdd2,alu:0xd5d9de,laiton:0xc9a640,cuivre:0xc77a4a,bois:0xc9a46a,pvc:0xe8e8e8,acrylique:0x9fd4ff,beton:0xa0a0a0};
+const PLANES={XY:'Avant (XY)',XZ:'Dessus (XZ)',YZ:'Droite (YZ)'};
+
+// ---------- Modèle paramétrique ----------
+let M={feats:[],nid:1},sel=null,undoS=[],redoS=[];
+function snap(){undoS.push(JSON.stringify(M));if(undoS.length>80)undoS.shift();redoS=[]}
+function save(){try{localStorage.setItem('planpro3d',JSON.stringify(M))}catch(e){}}
+const fid=id=>M.feats.find(f=>f.id==id);
+const bodies=()=>M.feats.filter(f=>f.type=='extrude'||f.type=='revolve');
+
+function newFeat(type){const n=M.feats.filter(f=>f.type==type).length+1,b=bodies(),par=fid(sel)&&(fid(sel).type=='extrude'?sel:fid(sel).parent)||(b.filter(x=>x.type=='extrude').pop()||{}).id;
+  if(type=='extrude')return{type,name:'Extrusion '+n,plane:'XY',profile:'rect',w:100,h:60,d:40,r:0,pts:'0,0; 80,0; 80,30; 30,60; 0,60',depth:20,sym:false,x:0,y:0,z:0,mat:'acier',qty:1,on:true};
+  if(type=='revolve')return{type,name:'Révolution '+n,plane:'XY',pts:'0,0; 20,0; 20,10; 12,10; 12,50; 0,50',angle:360,x:0,y:0,z:0,mat:'acier',qty:1,on:true};
+  if((type=='hole'||type=='cut')&&!par){alert('Créez d\'abord une extrusion (le trou se fait dans une extrusion).');return null}
+  if(type=='hole')return{type,name:'Trou '+n,parent:par,d:10,u:0,v:0,pattern:'none',n:4,du:30,dv:0,pr:30,cb:0,cbd:0,on:true};
+  if(type=='cut')return{type,name:'Enlèvement '+n,parent:par,profile:'rect',w:30,h:20,d:20,r:0,u:0,v:0,pts:'0,0; 20,0; 10,20',on:true}}
+document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const f=newFeat(b.dataset.add);if(!f)return;snap();f.id=M.nid++;M.feats.push(f);sel=f.id;rebuild();fitView()});
+
+// ---------- Géométrie ----------
+const parsePts=s=>String(s).split(';').map(p=>p.split(',').map(Number)).filter(p=>p.length==2&&p.every(isFinite));
+function profileShape(f,shape){// dans le plan local (u,v), centré
+  const S=shape||new THREE.Shape();
+  if(f.profile=='circle'){S.absarc(f.u||0,f.v||0,f.d/2,0,Math.PI*2,false);return S}
+  if(f.profile=='poly'){const p=parsePts(f.pts);if(p.length<3)return null;{let a=0;p.forEach((q,i)=>{const r=p[(i+1)%p.length];a+=q[0]*r[1]-r[0]*q[1]});if(a<0)p.reverse()}const cx=f.u||0,cy=f.v||0;p.forEach(([x,y],i)=>i?S.lineTo(x+cx,y+cy):S.moveTo(x+cx,y+cy));S.closePath();return S}
+  const w=f.w/2,h=f.h/2,r=Math.min(f.r||0,w-.01,h-.01),cx=f.u||0,cy=f.v||0;
+  if(r>0){S.moveTo(cx-w+r,cy-h);S.lineTo(cx+w-r,cy-h);S.absarc(cx+w-r,cy-h+r,r,-Math.PI/2,0,false);S.lineTo(cx+w,cy+h-r);S.absarc(cx+w-r,cy+h-r,r,0,Math.PI/2,false);
+    S.lineTo(cx-w+r,cy+h);S.absarc(cx-w+r,cy+h-r,r,Math.PI/2,Math.PI,false);S.lineTo(cx-w,cy-h+r);S.absarc(cx-w+r,cy-h+r,r,Math.PI,Math.PI*1.5,false)}
+  else{S.moveTo(cx-w,cy-h);S.lineTo(cx+w,cy-h);S.lineTo(cx+w,cy+h);S.lineTo(cx-w,cy+h);S.closePath()}return S}
+function holeCenters(h){const c=[];const n=Math.max(1,Math.round(h.n));
+  if(h.pattern=='lin')for(let i=0;i<n;i++)c.push([h.u+i*h.du,h.v+i*h.dv]);
+  else if(h.pattern=='circ')for(let i=0;i<n;i++){const a=i/n*Math.PI*2;c.push([h.u+Math.cos(a)*h.pr,h.v+Math.sin(a)*h.pr])}
+  else c.push([h.u,h.v]);return c}
+function orient(g,f){if(f.plane=='XZ')g.rotateX(-Math.PI/2);else if(f.plane=='YZ')g.rotateY(Math.PI/2);g.translate(f.x||0,f.y||0,f.z||0);return g}
+function buildGeom(f){
+  if(f.type=='extrude'){const S=profileShape(f);if(!S)return null;
+    M.feats.filter(h=>h.on&&h.parent==f.id).forEach(h=>{
+      if(h.type=='hole')holeCenters(h).forEach(([x,y])=>{const p=new THREE.Path();p.absarc(x,y,h.d/2,0,Math.PI*2,true);S.holes.push(p)});
+      if(h.type=='cut'){const p=profileShape(h,new THREE.Path());if(p)S.holes.push(p)}});
+    const g=new THREE.ExtrudeGeometry(S,{depth:f.depth,bevelEnabled:false,curveSegments:48});if(f.sym)g.translate(0,0,-f.depth/2);return orient(g,f)}
+  if(f.type=='revolve'){const p=parsePts(f.pts).map(([r,y])=>new THREE.Vector2(Math.max(0,r),y));if(p.length<2)return null;
+    const g=new THREE.LatheGeometry(p,64,0,Math.max(1,Math.min(360,f.angle))*Math.PI/180);return orient(g,f)}
+  return null}
+function volume(g){const geo=g.index?g.toNonIndexed():g,q=geo.attributes.position.array;g.computeBoundingBox();const c=g.boundingBox.getCenter(new THREE.Vector3());let v=0;
+  for(let i=0;i<q.length;i+=9){const a=[q[i]-c.x,q[i+1]-c.y,q[i+2]-c.z],b=[q[i+3]-c.x,q[i+4]-c.y,q[i+5]-c.z],d=[q[i+6]-c.x,q[i+7]-c.y,q[i+8]-c.z];
+    v+=(a[0]*(b[1]*d[2]-b[2]*d[1])-a[1]*(b[0]*d[2]-b[2]*d[0])+a[2]*(b[0]*d[1]-b[1]*d[0]))/6}return Math.abs(v)}
+function area(g){const geo=g.index?g.toNonIndexed():g,p=geo.attributes.position.array,a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3();let s=0;
+  for(let i=0;i<p.length;i+=9){a.set(p[i],p[i+1],p[i+2]);b.set(p[i+3],p[i+4],p[i+5]);c.set(p[i+6],p[i+7],p[i+8]);s+=b.sub(a).cross(c.sub(a)).length()/2}return s}
+
+// ---------- Scène ----------
+const view=$('view');
+const R=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});R.setPixelRatio(devicePixelRatio);view.prepend(R.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x1a1d23);
+const cam=new THREE.PerspectiveCamera(40,1,0.1,1e6);cam.position.set(200,160,220);
+const ctl=new THREE.OrbitControls(cam,R.domElement);ctl.enableDamping=true;
+scene.add(new THREE.HemisphereLight(0xffffff,0x445566,.75));const dl=new THREE.DirectionalLight(0xffffff,.7);dl.position.set(1,2,1.5);scene.add(dl);const dl2=new THREE.DirectionalLight(0xffffff,.3);dl2.position.set(-1,-.5,-1);scene.add(dl2);
+let grid=new THREE.GridHelper(1000,50,0x3a4050,0x262a33);scene.add(grid);
+const axes=new THREE.AxesHelper(50);scene.add(axes);
+const group=new THREE.Group();scene.add(group);
+let wire=false,edges=true,house=null;
+function resize(){const r=view.getBoundingClientRect();R.setSize(r.width,r.height);cam.aspect=r.width/r.height;cam.updateProjectionMatrix()}
+addEventListener('resize',resize);
+(function loop(){requestAnimationFrame(loop);ctl.update();try{placeLabels()}catch(e){}R.render(scene,cam)})();
+
+function rebuild(){group.clear();let tot={kg:0,vol:0,n:0};const info=[];
+  bodies().forEach(f=>{if(!f.on)return;let g;try{g=buildGeom(f)}catch(e){g=null}if(!g){info.push(f.name+' : profil invalide');return}
+    const selF=fid(sel),isSel=sel==f.id||(selF&&selF.parent==f.id);
+    const mat=new THREE.MeshStandardMaterial({color:COLORS[f.mat]||0xaaaaaa,metalness:['bois','pvc','acrylique','beton'].includes(f.mat)?0:.55,roughness:.45,wireframe:wire,emissive:isSel?0x3d5fa0:0,transparent:f.mat=='acrylique',opacity:f.mat=='acrylique'?.6:1,side:THREE.DoubleSide});
+    const m=new THREE.Mesh(g,mat);m.userData.id=f.id;group.add(m);
+    if(edges&&!wire)group.add(new THREE.LineSegments(new THREE.EdgesGeometry(g,25),new THREE.LineBasicMaterial({color:isSel?0xffb020:0x111111})));
+    const v=volume(g),kg=v*1e-9*DENS[f.mat]*(f.qty||1);f._v=v;f._a=area(g);f._kg=v*1e-9*DENS[f.mat];g.computeBoundingBox();f._bb=g.boundingBox;tot.kg+=kg;tot.vol+=v*(f.qty||1);tot.n+=f.qty||1});
+  if(house)group.add(house);
+  imports.forEach(im=>{group.add(im.mesh);if(edges&&!wire)group.add(im.edges);im.mesh.material.wireframe=wire;tot.kg+=im.kg;tot.vol+=im.vol;tot.n++});
+  $('info').textContent=`Corps: ${tot.n}   Volume: ${(tot.vol/1000).toFixed(1)} cm³   Masse: ${tot.kg.toFixed(3)} kg`+(info.length?'\n⚠ '+info.join('\n⚠ '):'');
+  renderTree();renderProps();save()}
+
+// ---------- Arbre du modèle ----------
+const ICON={extrude:'⬆',revolve:'🔄',hole:'🕳',cut:'✂'};
+function renderTree(){const T=$('tree');let h='<h4>Arbre du modèle</h4><div class="it" style="cursor:default">📦 PIECE.prt</div>';
+  ['XY','XZ','YZ'].forEach(p=>h+=`<div class="it sub" style="cursor:default;color:#9aa0ab">▱ Plan ${p}</div>`);
+  bodies().forEach(f=>{h+=`<div class="it sub ${f.id==sel?'sel':''} ${f.on?'':'off'}" data-id="${f.id}">${ICON[f.type]} ${f.name}</div>`;
+    M.feats.filter(x=>x.parent==f.id).forEach(x=>h+=`<div class="it sub ${x.id==sel?'sel':''} ${x.on?'':'off'}" data-id="${x.id}" style="margin-left:36px">${ICON[x.type]} ${x.name}</div>`)});
+  if(house)h+='<div class="it sub">🏠 Maison (depuis plan)</div>';
+  imports.forEach((im,i)=>h+=`<div class="it sub" title="Pièce importée">📥 ${im.name} <button data-rm="${i}" style="margin-left:auto;padding:0 6px">✕</button></div>`);
+  if(!M.feats.length&&!house)h+='<p class="note">Ajoutez une fonction avec les boutons du haut : Extrusion, Révolution, puis Trou / Enlèvement dans une extrusion.</p>';
+  T.innerHTML=h;T.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{imports.splice(+b.dataset.rm,1);rebuild()});T.querySelectorAll('[data-id]').forEach(e=>e.onclick=()=>{sel=+e.dataset.id;rebuild()})}
+
+// ---------- Paramètres ----------
+function renderProps(){const P=$('props'),f=fid(sel);
+  if(!f){P.innerHTML=`<h4>Paramètres</h4><p class="note">Sélectionnez une fonction dans l'arbre ou cliquez sur une pièce en 3D.<br><br>
+  <b>Comme Pro/E :</b> chaque fonction garde ses cotes. Changez une valeur → la pièce est régénérée.<br><br>
+  • <b>Extrusion</b> : profil (rectangle avec congés, cercle, polygone) + profondeur.<br>• <b>Révolution</b> : profil « rayon,hauteur » tourné autour de l'axe.<br>
+  • <b>Trou</b> : traversant, avec motif linéaire ou circulaire.<br>• <b>Enlèvement</b> : découpe traversante (rainure, fenêtre, poche).<br><br>
+  Souris : gauche = tourner, droite = déplacer, molette = zoom. Tactile : 1 doigt = tourner, 2 doigts = zoom/déplacer.<br>📏 Mesurer : cliquez 2 points pour la distance.</p>${massTable()}`;return}
+  const F=[];const L=(lb,k,kind='num',opts)=>F.push({lb,k,kind,opts});
+  L('Nom','name','txt');
+  if(f.type=='extrude'||f.type=='revolve'){L('Plan d\'esquisse','plane','sel',PLANES)}
+  if(f.type=='extrude'||f.type=='cut'){L('Profil','profile','sel',{rect:'Rectangle',circle:'Cercle',poly:'Polygone'});
+    if(f.profile=='rect'){L('Largeur (mm)','w');L('Hauteur (mm)','h');L('Rayon des congés','r')}
+    if(f.profile=='circle')L('Diamètre (mm)','d');
+    if(f.profile=='poly')L('Points (x,y; …)','pts','area')}
+  if(f.type=='cut'){L('Position U','u');L('Position V','v')}
+  if(f.type=='extrude'){L('Profondeur (mm)','depth');L('Symétrique','sym','bool')}
+  if(f.type=='revolve'){L('Profil (rayon,haut; …)','pts','area');L('Angle (°)','angle')}
+  if(f.type=='extrude'||f.type=='revolve'){L('Décalage X','x');L('Décalage Y','y');L('Décalage Z','z');L('Matériau','mat','sel',Object.fromEntries(Object.keys(DENS).map(k=>[k,k])));L('Quantité','qty')}
+  if(f.type=='hole'){L('Diamètre (mm)','d');L('Position U','u');L('Position V','v');L('Motif','pattern','sel',{none:'Aucun',lin:'Linéaire',circ:'Circulaire'});
+    if(f.pattern!='none')L('Nombre','n');if(f.pattern=='lin'){L('Pas U','du');L('Pas V','dv')}if(f.pattern=='circ')L('Rayon du motif','pr')}
+  if(f.type=='hole'||f.type=='cut')L('Dans','parent','sel',Object.fromEntries(bodies().filter(b=>b.type=='extrude').map(b=>[b.id,b.name])));
+  L('Actif','on','bool');
+  let h=`<h4>${ICON[f.type]} ${f.name}</h4>`;
+  F.forEach((x,i)=>{const v=f[x.k];let inp;
+    if(x.kind=='sel')inp=`<select data-i="${i}">${Object.entries(x.opts).map(([k,l])=>`<option value="${k}" ${k==v?'selected':''}>${l}</option>`).join('')}</select>`;
+    else if(x.kind=='bool')inp=`<select data-i="${i}"><option value="1" ${v?'selected':''}>Oui</option><option value="0" ${v?'':'selected'}>Non</option></select>`;
+    else if(x.kind=='area')inp=`<textarea data-i="${i}" rows="3">${v}</textarea>`;
+    else inp=`<input data-i="${i}" value="${String(v).replace(/"/g,'&quot;')}">`;
+    h+=x.kind=='area'?`<div style="margin-bottom:6px"><span>${x.lb}</span>${inp}</div>`:`<div class="f"><span>${x.lb}</span>${inp}</div>`});
+  if(f._v!=null){const b=f._bb,s=new THREE.Vector3();b.getSize(s);
+    h+=`<h4>Propriétés de masse</h4><table><tr><td>Volume</td><td>${(f._v/1000).toFixed(2)} cm³</td></tr><tr><td>Surface</td><td>${(f._a/100).toFixed(1)} cm²</td></tr>
+    <tr><td>Masse unitaire</td><td>${f._kg.toFixed(3)} kg</td></tr><tr><td>Masse × ${f.qty}</td><td>${(f._kg*f.qty).toFixed(3)} kg</td></tr>
+    <tr><td>Encombrement</td><td>${s.x.toFixed(1)} × ${s.y.toFixed(1)} × ${s.z.toFixed(1)} mm</td></tr></table>`}
+  if(f.type=='hole'||f.type=='cut')h+='<p class="note">U / V = position dans l\'esquisse de l\'extrusion parente (0,0 = centre du profil rectangle/cercle).</p>';
+  h+=`<div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap"><button id="dupB">Dupliquer</button><button id="delB">🗑 Supprimer</button><button id="upB">▲</button><button id="dnB">▼</button></div>`;
+  P.innerHTML=h;
+  P.querySelectorAll('[data-i]').forEach(el=>el.onchange=()=>{const x=F[el.dataset.i];let v=el.value;
+    if(x.kind=='num'){v=parseFloat(v.replace(',','.'));if(!isFinite(v)){renderProps();return}if(['w','h','d','depth','qty','n'].includes(x.k)&&v<=0){renderProps();return}}
+    if(x.kind=='bool')v=v=='1';if(x.k=='parent')v=+v;snap();f[x.k]=v;rebuild()});
+  $('delB').onclick=()=>{snap();M.feats=M.feats.filter(x=>x.id!=f.id&&x.parent!=f.id);sel=null;rebuild()};
+  $('dupB').onclick=()=>{snap();const c=JSON.parse(JSON.stringify(f));c.id=M.nid++;c.name+=' (copie)';if(c.type=='extrude'||c.type=='revolve')c.x+=20;M.feats.push(c);
+    if(f.type=='extrude')M.feats.filter(x=>x.parent==f.id&&x.id!=c.id).forEach(x=>{const y=JSON.parse(JSON.stringify(x));y.id=M.nid++;y.parent=c.id;M.feats.push(y)});sel=c.id;rebuild()};
+  const mv=d=>{const i=M.feats.indexOf(f),j=i+d;if(j<0||j>=M.feats.length)return;snap();[M.feats[i],M.feats[j]]=[M.feats[j],M.feats[i]];rebuild()};$('upB').onclick=()=>mv(-1);$('dnB').onclick=()=>mv(1)}
+function massTable(){const b=bodies().filter(f=>f.on&&f._kg!=null);if(!b.length&&!imports.length)return'';let t=0;
+  return'<h4>Nomenclature</h4><table>'+b.map(f=>{t+=f._kg*f.qty;return`<tr><td>${f.name} ×${f.qty}<br><span class="note">${f.mat}</span></td><td>${(f._kg*f.qty).toFixed(3)} kg</td></tr>`}).join('')+imports.map(im=>{t+=im.kg;const s=im.size;return`<tr><td>📥 ${im.name}<br><span class="note">acier (estimé) · ${s.x.toFixed(1)}×${s.y.toFixed(1)}×${s.z.toFixed(1)} mm</span></td><td>${im.kg.toFixed(3)} kg</td></tr>`}).join('')+`<tr><td><b>Total</b></td><td><b>${t.toFixed(3)} kg</b></td></tr></table>`}
+
+// ---------- Sélection 3D ----------
+const ray=new THREE.Raycaster();let down=null;
+R.domElement.addEventListener('pointerdown',e=>down={x:e.clientX,y:e.clientY});
+R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down.x,e.clientY-down.y)>4)return;const r=R.domElement.getBoundingClientRect();
+  ray.setFromCamera({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1},cam);
+  const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh);
+  if(measuring){if(!h.length)return;measurePick(h[0]);return}
+  sel=h.length?h[0].object.userData.id||null:null;rebuild()});
+// ---------- Mesure 3D ----------
+let measuring=false,mA=null;const mG=new THREE.Group();scene.add(mG);const measures=[];
+function measurePick(hit){let p=hit.point.clone();const o=hit.object,f=hit.face,pos=o.geometry.attributes.position,tol=bbox().getSize(new THREE.Vector3()).length()*0.02;
+  if(f)[f.a,f.b,f.c].forEach(i=>{const v=new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(o.matrixWorld);if(v.distanceTo(hit.point)<tol&&v.distanceTo(hit.point)<p.distanceTo(hit.point)+1e-9)p=v});
+  const r=bbox().getSize(new THREE.Vector3()).length()*0.006;const dot=new THREE.Mesh(new THREE.SphereGeometry(r,12,8),new THREE.MeshBasicMaterial({color:0x3dff8b,depthTest:false}));dot.position.copy(p);dot.renderOrder=9;mG.add(dot);
+  if(!mA){mA=p;$('info').textContent='📏 Cliquez le 2e point';return}
+  const a=mA,b=p;mA=null;const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),new THREE.LineBasicMaterial({color:0x3dff8b,depthTest:false}));l.renderOrder=9;mG.add(l);
+  const d=a.distanceTo(b),el=document.createElement('div');el.style.cssText='position:absolute;background:#000c;color:#3dff8b;border:1px solid #3dff8b;border-radius:5px;padding:2px 6px;font:12px monospace;transform:translate(-50%,-50%);white-space:nowrap';
+  el.textContent=d.toFixed(2)+' mm';$('labels').append(el);measures.push({m:a.clone().add(b).multiplyScalar(.5),el});
+  $('info').textContent=`📏 Distance : ${d.toFixed(2)} mm  (${(d/25.4).toFixed(3)} po)\n   ΔX ${(b.x-a.x).toFixed(2)}   ΔY ${(b.y-a.y).toFixed(2)}   ΔZ ${(b.z-a.z).toFixed(2)} mm`}
+function placeLabels(){const r=R.domElement.getBoundingClientRect();measures.forEach(m=>{const v=m.m.clone().project(cam);m.el.style.display=v.z>1?'none':'';m.el.style.left=(v.x+1)/2*r.width+'px';m.el.style.top=(1-v.y)/2*r.height+'px'})}
+$('measB').onclick=()=>{measuring=!measuring;mA=null;$('measB').classList.toggle('on',measuring);$('info').textContent=measuring?'📏 Cliquez 2 points sur la pièce (accroche aux sommets)':''};
+$('clrM').onclick=()=>{mG.clear();measures.forEach(m=>m.el.remove());measures.length=0;mA=null};
+
+// ---------- Vues ----------
+function bbox(){const b=new THREE.Box3().setFromObject(group);return b.isEmpty()?new THREE.Box3(new THREE.Vector3(-50,-50,-50),new THREE.Vector3(50,50,50)):b}
+function setView(v){const b=bbox(),c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()).length()||100,d=s*1.4;
+  const dir={iso:[1,.8,1.1],front:[0,0,1],top:[0,1,0.0001],right:[1,0,0]}[v]||[1,.8,1.1];const n=new THREE.Vector3(...dir).normalize();
+  cam.position.copy(c).addScaledVector(n,d);ctl.target.copy(c);cam.near=s/1000;cam.far=s*100;cam.updateProjectionMatrix();
+  scene.remove(grid);const gs=Math.pow(10,Math.ceil(Math.log10(s*2)));grid=new THREE.GridHelper(gs,20,0x3a4050,0x262a33);grid.position.y=b.min.y;scene.add(grid);axes.scale.setScalar(s/200)}
+const fitView=()=>setView('iso');
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>setView(b.dataset.v));$('fitB').onclick=fitView;
+$('wireB').onclick=()=>{wire=!wire;$('wireB').classList.toggle('on',wire);rebuild()};$('edgeB').onclick=()=>{edges=!edges;$('edgeB').classList.toggle('on',edges);rebuild()};
+
+// ---------- Maison 3D depuis Plan 2D ----------
+$('houseB').onclick=()=>{let P;try{P=JSON.parse(localStorage.getItem('planpro')||'null')}catch(e){}
+  const walls=P&&P.ents?P.ents.filter(e=>e.type=='wall'):[];if(!walls.length){alert('Aucun mur trouvé. Dessinez d\'abord un plan dans le Plan 2D (mode Bâtiment).');return}
+  if(house){house=null;$('houseB').classList.remove('on');rebuild();fitView();return}
+  house=new THREE.Group();const wm=new THREE.MeshStandardMaterial({color:0xece6da,roughness:.9}),om=new THREE.MeshStandardMaterial({color:0x8fb8ff,transparent:true,opacity:.35});
+  const box=(L,H,T,cx,cy,cz,ang,m)=>{const g=new THREE.BoxGeometry(L,H,T),me=new THREE.Mesh(g,m);me.position.set(cx,cy,cz);me.rotation.y=-ang;house.add(me);
+    const ls=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:0x555555}));ls.position.copy(me.position);ls.rotation.copy(me.rotation);house.add(ls)};
+  walls.forEach(w=>{const dx=w.b.x-w.a.x,dy=w.b.y-w.a.y,L=Math.hypot(dx,dy),ang=Math.atan2(dy,dx),ux=dx/L,uy=dy/L;
+    const ops=P.ents.filter(o=>(o.type=='door'||o.type=='window')&&Math.abs((o.p.x-w.a.x)*-uy+(o.p.y-w.a.y)*ux)<w.t/2+5).map(o=>{const s=(o.p.x-w.a.x)*ux+(o.p.y-w.a.y)*uy;return{s0:s-o.w/2,s1:s+o.w/2,sill:o.type=='door'?0:900,h:o.h,win:o.type=='window'}}).sort((a,b)=>a.s0-b.s0);
+    const piece=(s0,s1,y0,y1,m=wm)=>{if(s1-s0<1||y1-y0<1)return;const sm=(s0+s1)/2;box(s1-s0,y1-y0,w.t,w.a.x+ux*sm,(y0+y1)/2,w.a.y+uy*sm,ang,m)};
+    let s=0;ops.forEach(o=>{piece(s,o.s0,0,w.h);piece(o.s0,o.s1,0,o.sill);piece(o.s0,o.s1,o.sill+o.h,w.h);if(o.win)piece(o.s0,o.s1,o.sill,o.sill+o.h,om);s=o.s1});piece(s,L,0,w.h)});
+  P.ents.filter(e=>e.type=='room').forEach(r=>{const S=new THREE.Shape(r.pts.map(p=>new THREE.Vector2(p.x,-p.y)));const g=new THREE.ExtrudeGeometry(S,{depth:20,bevelEnabled:false});g.rotateX(-Math.PI/2);g.translate(0,-20,0);
+    house.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:r.floor=='ceramique'?0xdddddd:0xb08a5a,roughness:.8})))});
+  $('houseB').classList.add('on');rebuild();fitView()};
+
+// ---------- Fichiers ----------
+function download(name,data,type){const a=document.createElement('a');a.download=name;a.href=data.startsWith&&data.startsWith('data:')?data:URL.createObjectURL(new Blob([data],{type}));a.click()}
+$('saveB').onclick=()=>download('piece.prt.json',JSON.stringify(M,(k,v)=>k.startsWith('_')?undefined:v,1),'application/json');
+$('openB').onclick=()=>$('file').click();
+$('file').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const o=JSON.parse(t);if(!o.feats)throw 0;snap();M=o;sel=null;rebuild();fitView()}catch(x){alert('Fichier invalide')}});e.target.value=''};
+$('newB').onclick=()=>{if(!confirm('Nouvelle pièce ?'))return;snap();M={feats:[],nid:1};sel=null;house=null;rebuild();fitView()};
+$('undoB').onclick=()=>{if(!undoS.length)return;redoS.push(JSON.stringify(M));M=JSON.parse(undoS.pop());rebuild()};
+$('redoB').onclick=()=>{if(!redoS.length)return;undoS.push(JSON.stringify(M));M=JSON.parse(redoS.pop());rebuild()};
+$('pngB').onclick=()=>{R.render(scene,cam);download('piece.png',R.domElement.toDataURL('image/png'))};
+$('stlB').onclick=()=>{let s='solid piece\n';const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),n=new THREE.Vector3();
+  group.updateMatrixWorld(true);group.traverse(o=>{if(!o.isMesh||o.material.transparent&&o.material.opacity<.5)return;const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry,p=g.attributes.position;
+    for(let i=0;i<p.count;i+=3){a.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld);b.fromBufferAttribute(p,i+1).applyMatrix4(o.matrixWorld);c.fromBufferAttribute(p,i+2).applyMatrix4(o.matrixWorld);
+      n.subVectors(c,b).cross(new THREE.Vector3().subVectors(a,b)).normalize();s+=`facet normal ${n.x} ${n.y} ${n.z}\nouter loop\nvertex ${a.x} ${a.y} ${a.z}\nvertex ${b.x} ${b.y} ${b.z}\nvertex ${c.x} ${c.y} ${c.z}\nendloop\nendfacet\n`}});
+  download('piece.stl',s+'endsolid piece\n','model/stl')};
+$('treeT').onclick=()=>$('tree').classList.toggle('open');$('propT').onclick=()=>$('props').classList.toggle('open');
+addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if((e.ctrlKey||e.metaKey)&&e.key=='z'){e.preventDefault();$('undoB').click()}
+  if((e.ctrlKey||e.metaKey)&&e.key=='y'){e.preventDefault();$('redoB').click()}if(e.key=='Delete'&&sel){$('delB')&&$('delB').click()}});
+
+
+// ---------- Import / export formats d'échange (Inventor, SolidWorks, AutoCAD, Pro/E...) ----------
+const imports=[];let occt=null;
+function loadOcct(){if(occt)return occt;occt=new Promise((ok,ko)=>{const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/occt-import-js@0.0.22/dist/occt-import-js.js';
+  sc.onload=()=>occtimportjs({locateFile:n=>'https://cdn.jsdelivr.net/npm/occt-import-js@0.0.22/dist/'+n}).then(ok,ko);sc.onerror=()=>{occt=null;ko(new Error('Chargement du lecteur STEP impossible (connexion internet requise)'))};document.head.append(sc)});return occt}
+function parseSTL(buf){const dv=new DataView(buf),n=dv.getUint32(80,true);const pos=[];
+  if(84+n*50==buf.byteLength){for(let i=0;i<n;i++){const o=84+i*50+12;for(let k=0;k<9;k++)pos.push(dv.getFloat32(o+k*4,true))}}
+  else{const t=new TextDecoder().decode(buf),re=/vertex\s+(\S+)\s+(\S+)\s+(\S+)/g;let m;while(m=re.exec(t))pos.push(+m[1],+m[2],+m[3])}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));return[g]}
+function parseOBJ(t){const v=[],pos=[];t.split('\n').forEach(l=>{const p=l.trim().split(/\s+/);if(p[0]=='v')v.push([+p[1],+p[2],+p[3]]);
+  else if(p[0]=='f'){const ix=p.slice(1).map(x=>{let i=parseInt(x);return i<0?v.length+i:i-1});for(let k=1;k<ix.length-1;k++)[ix[0],ix[k],ix[k+1]].forEach(i=>pos.push(...v[i]))}});
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));return[g]}
+async function parseCAD(buf,ext){const o=await loadOcct(),u=new Uint8Array(buf);
+  const r=ext=='iges'||ext=='igs'?o.ReadIgesFile(u,null):ext=='brep'?o.ReadBrepFile(u,null):o.ReadStepFile(u,null);
+  if(!r||!r.success||!r.meshes.length)throw new Error('Fichier non lisible');
+  return r.meshes.map(m=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(m.attributes.position.array,3));
+    if(m.index)g.setIndex(Array.from(m.index.array));g.userData.color=m.color;g.userData.name=m.name;return g})}
+async function importFile(file){const ext=file.name.split('.').pop().toLowerCase(),buf=await file.arrayBuffer();
+  $('info').textContent='⏳ Lecture de '+file.name+'…';
+  let geos=ext=='stl'?parseSTL(buf):ext=='obj'?parseOBJ(new TextDecoder().decode(buf)):await parseCAD(buf,ext);
+  geos.forEach((g,i)=>{if(!g.attributes.normal)g.computeVertexNormals();const col=g.userData.color?new THREE.Color(...g.userData.color):new THREE.Color(0xb7c2cc);
+    const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:col,metalness:.4,roughness:.5,side:THREE.DoubleSide})),ed=new THREE.LineSegments(new THREE.EdgesGeometry(g,30),new THREE.LineBasicMaterial({color:0x111111}));
+    g.computeBoundingBox();const vol=volume(g);imports.push({name:(g.userData.name||file.name)+(geos.length>1&&!g.userData.name?' #'+(i+1):''),mesh,edges:ed,vol,kg:vol*1e-9*DENS.acier,size:g.boundingBox.getSize(new THREE.Vector3())})})}
+$('impB').onclick=()=>$('impF').click();
+$('impF').onchange=async e=>{for(const f of e.target.files){try{await importFile(f)}catch(err){alert(f.name+' : '+err.message)}}e.target.value='';rebuild();fitView()};
+$('objB').onclick=()=>{let s='# drawGene 3D\n',off=1;group.updateMatrixWorld(true);const a=new THREE.Vector3();
+  group.traverse(o=>{if(!o.isMesh||o.material.transparent&&o.material.opacity<.5)return;const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry,p=g.attributes.position;s+='o corps'+off+'\n';
+    for(let i=0;i<p.count;i++){a.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld);s+=`v ${a.x} ${a.y} ${a.z}\n`}for(let i=0;i<p.count;i+=3)s+=`f ${off+i} ${off+i+1} ${off+i+2}\n`;off+=p.count});
+  download('piece.obj',s,'text/plain')};
+
+// ---------- Démarrage : pièce exemple ----------
+function example(){M={feats:[],nid:1};const A=(f)=>{f.id=M.nid++;M.feats.push(f);return f};
+  const b=A({type:'extrude',name:'Bride',plane:'XZ',profile:'circle',w:100,h:60,d:120,r:0,pts:'',depth:12,sym:false,x:0,y:0,z:0,mat:'acier',qty:1,on:true});
+  A({type:'hole',name:'Perçages Ø10 ×6',parent:b.id,d:10,u:0,v:0,pattern:'circ',n:6,du:30,dv:0,pr:45,on:true});
+  A({type:'hole',name:'Alésage central',parent:b.id,d:30,u:0,v:0,pattern:'none',n:1,du:0,dv:0,pr:0,on:true});
+  A({type:'revolve',name:'Moyeu',plane:'XY',pts:'15,12; 28,12; 28,45; 22,50; 15,50',angle:360,x:0,y:0,z:0,mat:'acier',qty:1,on:true})}
+try{const o=JSON.parse(localStorage.getItem('planpro3d')||'null');if(o&&o.feats&&o.feats.length)M=o;else example()}catch(e){example()}
+resize();rebuild();fitView();
+</script>
+</body>
+</html>
