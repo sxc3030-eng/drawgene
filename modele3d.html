@@ -26,7 +26,7 @@ select,input,textarea{background:#1b1d23;border:1px solid var(--line);border-rad
 #view{flex:1;position:relative;touch-action:none}
 #view canvas{display:block}
 #vbtn{position:absolute;top:8px;left:8px;display:flex;gap:4px;flex-wrap:wrap}
-#info{position:absolute;left:8px;bottom:8px;background:#000a;padding:6px 10px;border-radius:6px;font:12px monospace;color:#cfd3da;white-space:pre}
+#info{position:absolute;left:8px;bottom:8px;pointer-events:none;max-width:calc(100% - 16px);white-space:pre-wrap;background:#000a;padding:6px 10px;border-radius:6px;font:12px monospace;color:#cfd3da;white-space:pre}
 #props{width:280px;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:10px}
 h4{font-size:11px;text-transform:uppercase;color:var(--mut);margin:10px 0 6px}
 .f{display:grid;grid-template-columns:1fr 1.2fr;gap:4px 8px;align-items:center;margin-bottom:5px}
@@ -43,7 +43,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v8</small></b>
+  <b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v9</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a>
   <span class="sep"></span>
   <button data-add="extrude">⬆ Extrusion</button>
@@ -63,7 +63,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 <div id="main">
   <div id="tree"></div>
   <div id="view">
-    <div id="vbtn"><button data-v="iso">Iso</button><button data-v="front">Face</button><button data-v="top">Dessus</button><button data-v="right">Droite</button><button id="wireB">Filaire</button><button id="edgeB" class="on">Arêtes</button><button id="fitB">Ajuster</button><button id="measB">📏 Mesurer</button><button id="clrM">Effacer mesures</button><button id="tmB" class="on" title="Flèches : déplacer (G) / tourner (R)">✥ Déplacer</button><button id="secB">✂ Vue en coupe</button><span id="secP" hidden style="display:none;align-items:center;gap:4px;background:#22252c;border:1px solid #363a44;border-radius:7px;padding:2px 6px"><select id="secA" style="width:auto"><option>X</option><option selected>Y</option><option>Z</option></select><input type="range" id="secR" min="0" max="1000" value="500" style="width:120px"><button id="secF" title="Inverser le côté">⇄</button></span></div><div id="labels" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>
+    <div id="vbtn"><button data-v="iso">Iso</button><button data-v="front">Face</button><button data-v="top">Dessus</button><button data-v="right">Droite</button><button id="wireB">Filaire</button><button id="edgeB" class="on">Arêtes</button><button id="fitB">Ajuster</button><button id="measB">📏 Mesurer</button><button id="clrM">Effacer mesures</button><button id="boxB" title="Sélection par zone : glisser un rectangle (ou Maj + glisser)">⬚ Zone</button><button id="tmB" class="on" title="Flèches : déplacer (G) / tourner (R)">✥ Déplacer</button><button id="secB">✂ Vue en coupe</button><span id="secP" hidden style="display:none;align-items:center;gap:4px;background:#22252c;border:1px solid #363a44;border-radius:7px;padding:2px 6px"><select id="secA" style="width:auto"><option>X</option><option selected>Y</option><option>Z</option></select><input type="range" id="secR" min="0" max="1000" value="500" style="width:120px"><button id="secF" title="Inverser le côté">⇄</button></span></div><div id="labels" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>
     <div id="info"></div><div id="dimtags" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4"></div>
   </div>
   <div id="props"></div>
@@ -345,7 +345,10 @@ tc.addEventListener('objectChange',()=>{const o=tc.object,c=o&&compOf(o.userData
   c.x=r(o.position.x);c.y=r(o.position.y);c.z=r(o.position.z);c.rx=r(o.rotation.x/D2R);c.ry=r(o.rotation.y/D2R);c.rz=r(o.rotation.z/D2R);$('info').textContent=`🧩 ${c.name}   X ${c.x}  Y ${c.y}  Z ${c.z}   Rot ${c.rx}° ${c.ry}° ${c.rz}°`});
 tc.addEventListener('mouseUp',()=>{down=null;setTimeout(rebuild,0)});
 let rdown=null;R.domElement.addEventListener('contextmenu',e=>{e.preventDefault();if(rdown&&Math.hypot(e.clientX-rdown.x,e.clientY-rdown.y)<6)ctx3(e);rdown=null});
-R.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,b:e.button};if(e.button==2)rdown={x:e.clientX,y:e.clientY};if(e.button!==0)return;if(tc.dragging||tc.axis||measuring||consPick)return;const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);
+R.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,b:e.button};if(e.button==2)rdown={x:e.clientX,y:e.clientY};if(e.button!==0)return;
+  if((boxMode||e.shiftKey)&&!tc.axis&&!measuring&&!consPick){const r0=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r0),cam);const hit0=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh);
+    const hc=hit0.length&&hit0[0].object.userData.comp,sc0=selComp();if(!(hc&&sc0&&descIds(rootOf(sc0)).includes(hc))){startBox(e);return}}
+  if(tc.dragging||tc.axis||measuring||consPick)return;const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);
   // 1) poignées d'étirement
   if(handles){const h=ray.intersectObjects(handles.children);if(h.length){const H=h[0].object.userData.h,f=fid(H.f);if(!f)return;ctl.enabled=false;snap();
     const m=h[0].object.matrixWorld,org=new THREE.Vector3().setFromMatrixPosition(m),dir=new THREE.Vector3(0,1,0).transformDirection(m).normalize();
@@ -387,6 +390,24 @@ function consFace(hit){const o=hit.object,c=compOf(o.userData.comp),Wi=worldMat(
   if(rootOf(compOf(rec.comp))===rootOf(compOf(consA.comp))){$('info').textContent='🔗 Choisissez une face sur une AUTRE pièce';return}
   snap();const k={id:M.nid++,type:'mate',off:0,a:consA,b:rec};cons().push(k);consPick=0;consA=null;$('consB').classList.remove('on');sel='k'+k.id;rebuild()}
 $('consB').onclick=()=>{if(consPick){consPick=0;$('consB').classList.remove('on');rebuild()}else startCons()};
+// ---------- Sélection par zone (rectangle) ----------
+let boxMode=false;
+function startBox(e){ctl.enabled=false;const v=view.getBoundingClientRect(),d=document.createElement('div');d.style.cssText='position:absolute;border:1.5px solid #3d8bff;background:#3d8bff1a;z-index:5;pointer-events:none';view.append(d);
+  const sx=e.clientX,sy=e.clientY;let moved=false;
+  const mv=ev=>{moved=moved||Math.hypot(ev.clientX-sx,ev.clientY-sy)>4;const x0=Math.min(sx,ev.clientX),y0=Math.min(sy,ev.clientY),cr=ev.clientX<sx;
+    d.style.left=(x0-v.left)+'px';d.style.top=(y0-v.top)+'px';d.style.width=Math.abs(ev.clientX-sx)+'px';d.style.height=Math.abs(ev.clientY-sy)+'px';d.style.borderStyle=cr?'dashed':'solid';d.style.borderColor=cr?'#3dff8b':'#3d8bff'};
+  const up=ev=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);d.remove();ctl.enabled=true;down=null;if(!moved)return;
+    const r=R.domElement.getBoundingClientRect(),x0=Math.min(sx,ev.clientX),x1=Math.max(sx,ev.clientX),y0=Math.min(sy,ev.clientY),y1=Math.max(sy,ev.clientY),cross=ev.clientX<sx;
+    const inR=v3=>{const p=v3.clone().project(cam),X=r.left+(p.x+1)/2*r.width,Y=r.top+(1-p.y)/2*r.height;return p.z<1&&X>=x0&&X<=x1&&Y>=y0&&Y<=y1};
+    const roots=comps().filter(c=>c.parent==null||!compOf(c.parent)),found=[];group.updateMatrixWorld(true);
+    roots.forEach(c=>{const ids=descIds(c),b=new THREE.Box3();group.traverse(o=>{if(o.isMesh&&ids.includes(o.userData.comp))b.expandByObject(o)});if(b.isEmpty())return;
+      const P=[];for(let i=0;i<8;i++)P.push(new THREE.Vector3(i&1?b.max.x:b.min.x,i&2?b.max.y:b.min.y,i&4?b.max.z:b.min.z));if(cross?P.some(inR):P.every(inR))found.push(c.id)});
+    const add=ev.ctrlKey||ev.metaKey;selSet=add?[...new Set([...selSet,...(selComp()?[rootOf(selComp()).id]:[]),...found])]:found;
+    if(selSet.length==1){sel='c'+selSet[0];selSet=[]}else sel=selSet.length?'multi':null;rebuild();
+    $('info').textContent=found.length?`⬚ ${found.length} pièce(s) sélectionnée(s) — Suppr pour effacer, clic droit pour les actions`:'⬚ Aucune pièce dans la zone'};
+  addEventListener('pointermove',mv);addEventListener('pointerup',up)}
+$('boxB').onclick=()=>{boxMode=!boxMode;$('boxB').classList.toggle('on',boxMode);$('info').textContent=boxMode?'⬚ Glissez un rectangle pour sélectionner (de droite à gauche : tout ce qui touche). Recliquez ⬚ Zone pour tourner la vue.':''};
+
 // ---------- Suppression et menu clic droit ----------
 function deleteFeat(f){if(!f)return;const c=f.comp&&compOf(f.comp)||(fid(f.parent)&&fid(f.parent).comp&&compOf(fid(f.parent).comp));if(c&&isLocked(c)){alert('Cette pièce est verrouillée. Déverrouillez-la d\'abord.');return}
   snap();M.feats=M.feats.filter(x=>x.id!=f.id&&x.parent!=f.id);if(c&&!bodies().some(b=>b.comp==c.id)&&!kids(c).length){M.comps=comps().filter(x=>x!==c);M.cons=cons().filter(k=>k.a.comp!=c.id&&k.b.comp!=c.id)}sel=null;rebuild();$('info').textContent='🗑 Supprimé — Ctrl+Z pour annuler'}
@@ -394,7 +415,7 @@ function deleteSelection(){if(selSet.length){deleteComps(selSet);return}const c=
 function ctx3(e){const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh&&x.object.userData.id);
   const o=h.length?h[0].object:null,f=o?fid(o.userData.id):null,C=o&&o.userData.comp?compOf(o.userData.comp):null,RT=C?rootOf(C):null,items=[];
   const hasClip=!!(clip||(()=>{try{return localStorage.getItem('drawgene-clip')}catch(x){}})());
-  if(selSet.length>1&&C&&selSet.includes(RT.id)){items.push({head:selSet.length+' composants'},{icon:'🗑',label:'Supprimer la sélection',key:'Suppr',danger:true,action:()=>deleteComps(selSet)},{icon:'🧩',label:'Fusionner en sous-assemblage',action:()=>{sel='multi';rebuild();$('mF')&&$('mF').click()}},{icon:'📋',label:'Copier',key:'Ctrl+C',action:()=>copySel(selSet)},'-')}
+  if(selSet.length>1&&(!C||selSet.includes(RT.id))){items.push({head:selSet.length+' composants'},{icon:'🗑',label:'Supprimer la sélection',key:'Suppr',danger:true,action:()=>deleteComps(selSet)},{icon:'🧩',label:'Fusionner en sous-assemblage',action:()=>{sel='multi';rebuild();$('mF')&&$('mF').click()}},{icon:'📋',label:'Copier',key:'Ctrl+C',action:()=>copySel(selSet)},'-')}
   else if(C){const lk=isLocked(C);items.push({head:C.name+(lk?' 🔒':'')},
       {icon:'🗑',label:'Supprimer « '+C.name+' »',key:'Suppr',danger:true,disabled:lk,action:()=>deleteComps([C.id])});
     if(RT!==C)items.push({icon:'🗑',label:'Supprimer tout « '+RT.name+' »',danger:true,disabled:isLocked(RT),action:()=>deleteComps([RT.id])});
