@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#14315c"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes">
+<script src="update.js"></script>
 <script>if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{})</script>
 <title>drawGene</title>
 <style>
@@ -47,7 +48,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
 </head>
 <body>
 <div id="top">
-  <b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v4</small></b>
+  <b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v5</small></b>
   <select id="mode" style="width:auto"><option value="bat">🏠 Bâtiment</option><option value="mec">⚙️ Pièce mécanique</option></select>
   <select id="unit" style="width:auto"><option value="mm">mm</option><option value="m">m</option><option value="po">pi/po</option></select>
   <button id="undo" title="Ctrl+Z">↶</button><button id="redo" title="Ctrl+Y">↷</button>
@@ -469,6 +470,7 @@ function renderCfg(){const c=S.cfg;const C=$('cfg');
   (ou 🎯 <b>Échelle</b> : 2 points + distance connue)<br>3. ✨ <b>Détecter</b> : contour et trous créés automatiquement (ou tracez par-dessus).<br>4. ⬆ <b>Envoyer en 3D</b> avec l'épaisseur.</p>
   <h4>Exemples</h4><div style="display:flex;gap:6px;flex-wrap:wrap"><button id="exH">🏠 Maison exemple</button><button id="exP">⚙️ Pièce exemple</button></div>
   <p class="note">Le dessin est sauvegardé automatiquement dans ce navigateur. « Enregistrer » ajoute la pièce à la 📚 bibliothèque et télécharge un fichier .drawgene (double-clic pour l'ouvrir dans drawGene installé).</p>
+  <div class="bk" style="display:flex;gap:6px;margin-top:8px"><button onclick="DGUpdate.force()">🔄 Forcer la mise à jour</button></div>
   <p class="note"><a href="peinture.html" style="color:#9ec5ff">→ Ouvrir l'ancien module de dessin libre</a></p>`;
   const L=(id,k)=>$(id).onchange=()=>{const v=parseLen($(id).value);if(v>0)c[k]=v;renderCfg();save()};L('cT','wallT');L('cH','wallH');L('cE','ep');
   $('cM').onchange=()=>{c.wallMat=$('cM').value;save()};$('cS').onchange=()=>{c.stud=+$('cS').value;renderMat();save()};$('cF').onchange=()=>{c.faces=+$('cF').value;renderMat();save()};
