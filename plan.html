@@ -48,7 +48,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
 </head>
 <body>
 <div id="top">
-  <b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v5</small></b>
+  <b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v6</small></b>
   <select id="mode" style="width:auto"><option value="bat">🏠 Bâtiment</option><option value="mec">⚙️ Pièce mécanique</option></select>
   <select id="unit" style="width:auto"><option value="mm">mm</option><option value="m">m</option><option value="po">pi/po</option></select>
   <button id="undo" title="Ctrl+Z">↶</button><button id="redo" title="Ctrl+Y">↷</button>
@@ -56,7 +56,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
   <button id="fit">Ajuster</button><a href="modele3d.html"><button>🧊 3D</button></a>
   <button id="newB">Nouveau</button><button id="saveB">Enregistrer</button><button id="openB">Ouvrir</button>
   <button id="photoB">📷 Photo</button><button id="to3dB">⬆ Vers 3D</button><button id="pngB">PNG</button><button id="dxfB">DXF ⬇</button><button id="dxfI">DXF ⬆</button><button id="csvB">CSV</button><button id="printB">Imprimer</button>
-  <button id="panelB">Panneau</button>
+  <button id="winB" title="Afficher / masquer / réorganiser les fenêtres">🪟 Fenêtres</button><button id="panelB">Panneau</button>
   <input type="file" id="file" accept=".drawgene,.json,application/json" hidden><input type="file" id="photoF" accept="image/*" hidden><input type="file" id="dxfF" accept=".dxf" hidden>
 </div>
 <div id="main">
@@ -71,6 +71,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
 </div>
 <div id="status"><span id="sXY"></span><span id="sInfo"></span></div>
 <script src="lib.js"></script>
+<script src="panels.js"></script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
@@ -645,7 +646,7 @@ $('dxfF').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(txt=
   out.forEach(o=>{if(o.type=='poly'&&o.pts.length<2)return;if(!isShape(o)||o.type=='poly'&&!o.closed)o.role='trait';add(o)});
   sh.forEach(o=>o.role=defRole(shapeCenter(o)));sel=null;changed();fit();alertBox('📥 '+out.length+' entités importées')});e.target.value=''};
 
-$('undo').onclick=undo;$('redo').onclick=redo;$('fit').onclick=fit;$('panelB').onclick=()=>$('side').classList.toggle('open');
+$('undo').onclick=undo;$('redo').onclick=redo;$('fit').onclick=fit;
 function toggle(k){S.cfg[k]=!S.cfg[k];$(k=='snap'?'snapB':'ortho').classList.toggle('on',S.cfg[k]);save()}
 $('ortho').onclick=()=>toggle('ortho');$('snapB').onclick=()=>toggle('snap');
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#tabs button,.pane').forEach(x=>x.classList.remove('on'));b.classList.add('on');$(b.dataset.p).classList.add('on')});
@@ -658,7 +659,9 @@ addEventListener('resize',resize);
 try{const o=JSON.parse(localStorage.getItem('planpro')||'null');if(o&&o.ents){S={...S,...o,cfg:{...S.cfg,...o.cfg},prices:{...DEF_PRICES,...o.prices}}}}catch(e){}
 if(S.bg&&S.bg.src)bgImg.src=S.bg.src;
 $('unit').value=S.unit;$('ortho').classList.toggle('on',S.cfg.ortho);$('snapB').classList.toggle('on',S.cfg.snap);
-fixLayers();renderTabs();DGLib.mount($('stage'),'2d',cv,insertLib);
+fixLayers();renderTabs();const libBox=DGLib.mount(document.body,'2d',cv,insertLib,{embedded:true});
+const WM=DGPanels.init('2d',$('main'),$('stage'),[{id:'tools',title:'Outils',el:$('tools'),dock:'left',w:64},{id:'side',title:'Propriétés',el:$('side'),dock:'right',w:300,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:300,weight:1}]);
+$('winB').onclick=()=>WM.menu($('winB'));$('panelB').onclick=()=>WM.toggleDock('right');
 setMode(S.mode);renderCfg();resize();S.ents.forEach(e=>{if(e.id>=nid)nid=e.id+1});
 if(!S.ents.length)exampleHouse();else fit();renderProps();
 </script>

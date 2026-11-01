@@ -41,7 +41,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v5</small></b>
+  <b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v6</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a>
   <span class="sep"></span>
   <button data-add="extrude">⬆ Extrusion</button>
@@ -55,7 +55,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
   <span class="sep"></span>
   <button id="undoB">↶</button><button id="redoB">↷</button>
   <button id="newB">Nouveau</button><button id="saveB">Enregistrer</button><button id="openB">Ouvrir</button><button id="impB">📥 Importer STEP/IGES/STL/OBJ</button><button id="stlB">Export STL</button><button id="objB">Export OBJ</button><button id="pngB">PNG</button>
-  <button id="treeT">Arbre</button><button id="propT">Param.</button>
+  <button id="winB" title="Afficher / masquer / réorganiser les fenêtres">🪟 Fenêtres</button><button id="treeT">Arbre</button><button id="propT">Param.</button>
   <input type="file" id="file" accept=".drawgene,.json" hidden><input type="file" id="impF" accept=".step,.stp,.iges,.igs,.stl,.obj,.brep" multiple hidden>
 </div>
 <div id="main">
@@ -70,6 +70,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
 <script src="lib.js"></script>
+<script src="panels.js"></script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
@@ -457,7 +458,7 @@ $('stlB').onclick=()=>{let s='solid piece\n';const a=new THREE.Vector3(),b=new T
     for(let i=0;i<p.count;i+=3){a.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld);b.fromBufferAttribute(p,i+1).applyMatrix4(o.matrixWorld);c.fromBufferAttribute(p,i+2).applyMatrix4(o.matrixWorld);
       n.subVectors(c,b).cross(new THREE.Vector3().subVectors(a,b)).normalize();s+=`facet normal ${n.x} ${n.y} ${n.z}\nouter loop\nvertex ${a.x} ${a.y} ${a.z}\nvertex ${b.x} ${b.y} ${b.z}\nvertex ${c.x} ${c.y} ${c.z}\nendloop\nendfacet\n`}});
   download('piece.stl',s+'endsolid piece\n','model/stl')};
-$('treeT').onclick=()=>$('tree').classList.toggle('open');$('propT').onclick=()=>$('props').classList.toggle('open');
+
 // ---------- Clavier ----------
 addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const K=e.key,ctrl=e.ctrlKey||e.metaKey;
   if(ctrl&&K.toLowerCase()=='z'){e.preventDefault();$('undoB').click();return}if(ctrl&&K.toLowerCase()=='y'){e.preventDefault();$('redoB').click();return}
@@ -486,7 +487,7 @@ const SHEETS={'Contreplaqué 1/2"':12.7,'Contreplaqué 5/8"':15.9,'Contreplaqué
 const STOCK=[2438,3048,3658,4267,4877],FT=v=>{const e=Math.round(v/25.4*8),f=Math.floor(e/96),r=(e-f*96)/8,w=Math.floor(r),fr=Math.round((r-w)*8),g=(a,b)=>b?g(b,a%b):a,gg=g(fr,8);return`${f}'`+(r?` ${w}${fr?` ${fr/gg}/${8/gg}`:''}"`:'')};
 function parseMM(s){s=String(s).trim().replace(',','.');let m=s.match(/^(\d+(?:\.\d+)?)\s*'\s*(\d+(?:\.\d+)?)?(?:\s+(\d+)\/(\d+))?/);if(m)return((+m[1])*12+(+m[2]||0)+(m[3]?m[3]/m[4]:0))*25.4;
   m=s.match(/^(\d+(?:\.\d+)?)(?:\s+(\d+)\/(\d+))?\s*(po|"|in)$/);if(m)return(+m[1]+(m[2]?m[2]/m[3]:0))*25.4;m=s.match(/^(\d+(?:\.\d+)?)\s*(mm)?$/);return m?+m[1]:NaN}
-$('woodB').onclick=()=>{sel=null;selSet=[];tc.detach();const P=$('props');$('props').classList.add('open');
+$('woodB').onclick=()=>{sel=null;selSet=[];tc.detach();const P=$('props');showProps();
   P.innerHTML=`<h4>🪵 Ajouter du bois</h4><div class="f"><span>Type</span><select id="wT">${Object.keys(LUMBER).map(k=>`<option ${k=='2x4'?'selected':''}>${k}</option>`).join('')}${Object.keys(SHEETS).map(k=>`<option>${k}</option>`).join('')}</select></div>
   <div class="f"><span>Longueur</span><select id="wL"><option value="2353">Montant 92 5/8"</option><option value="2438">8'</option><option value="3048">10'</option><option value="3658">12'</option><option value="4267">14'</option><option value="4877">16'</option><option value="x">Autre…</option></select></div>
   <div class="f" id="wLx" hidden style="display:none"><span>Longueur (mm ou 7' 6")</span><input id="wLv" value="2000"></div>
@@ -505,6 +506,7 @@ $('woodB').onclick=()=>{sel=null;selSet=[];tc.detach();const P=$('props');$('pro
       f.id=M.nid++;f.comp=c.id;M.feats.push(f);groundLater.push(c.id)}
     rebuild();groundLater.forEach(id=>{const c=compOf(id);if(c)groundComp(c)});groundLater=[];sel=null;rebuild();if(bodies().length<=n)fitView();$('info').textContent=`🪵 ${n} × ${t} ajouté(s)`}};
 let groundLater=[];
+function showProps(){const p=WM.panels.props;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout()}}
 // ---------- Liste de coupe automatique ----------
 function cutList(){const lum={},sheets={},other=[];group.updateMatrixWorld(true);
   bodies().filter(f=>f.on&&f.type=='extrude'&&f.profile=='rect').forEach(f=>{const dims=[f.w,f.h,f.depth].map(v=>Math.round(v*10)/10).sort((a,b)=>a-b),q=f.qty||1;
@@ -515,7 +517,7 @@ function cutList(){const lum={},sheets={},other=[];group.updateMatrixWorld(true)
     pcs.forEach(p=>{let b=bins.find(b=>b.left>=p+(b.cuts.length?kerf:0));if(!b){const L=STOCK.find(s=>s>=p)||STOCK[STOCK.length-1];b={len:L,left:L,cuts:[],tooLong:p>L};bins.push(b)}b.left-=p+(b.cuts.length?kerf:0);b.cuts.push(p)});
     bins.forEach(b=>{const used=b.len-b.left,L=STOCK.find(s=>s>=used)||b.len;b.left+=L-b.len;b.len=L});res[t]={bins,pieces:pcs}});
   return{res,sheets,other}}
-$('cutlB').onclick=()=>{const {res,sheets,other}=cutList(),P=$('props');$('props').classList.add('open');sel=null;selSet=[];tc.detach();let h='<h4>📋 Liste de coupe</h4>',csv=['Type;Longueur planche;Coupes (mm);Chute (mm)'];
+$('cutlB').onclick=()=>{const {res,sheets,other}=cutList(),P=$('props');showProps();sel=null;selSet=[];tc.detach();let h='<h4>📋 Liste de coupe</h4>',csv=['Type;Longueur planche;Coupes (mm);Chute (mm)'];
   if(!Object.keys(res).length&&!Object.keys(sheets).length&&!other.length){P.innerHTML=h+'<p class="note">Aucune pièce. Ajoutez du 🪵 Bois ou des extrusions rectangulaires.</p>';return}
   Object.entries(res).forEach(([t,{bins,pieces}])=>{const tot=bins.reduce((s,b)=>s+b.len,0),use=pieces.reduce((s,p)=>s+p,0),cnt={};bins.forEach(b=>cnt[b.len]=(cnt[b.len]||0)+1);
     const grp={};pieces.forEach(p=>grp[p]=(grp[p]||0)+1);
@@ -567,7 +569,9 @@ function example(){M={feats:[],nid:1};const A=(f)=>{f.id=M.nid++;M.feats.push(f)
   A({type:'hole',name:'Alésage central',parent:b.id,d:30,u:0,v:0,pattern:'none',n:1,du:0,dv:0,pr:0,on:true});
   A({type:'revolve',name:'Moyeu',plane:'XY',pts:'15,12; 28,12; 28,45; 22,50; 15,50',angle:360,x:0,y:0,z:0,mat:'acier',qty:1,on:true})}
 try{const o=JSON.parse(localStorage.getItem('planpro3d')||'null');if(o&&o.feats&&o.feats.length)M=o;else example()}catch(e){example()}
-DGLib.mount(view,'3d',R.domElement,insert3D);
+const libBox=DGLib.mount(document.body,'3d',R.domElement,insert3D,{embedded:true});
+const WM=DGPanels.init('3d',$('main'),view,[{id:'tree',title:'Arbre du modèle',el:$('tree'),dock:'left',w:230},{id:'props',title:'Paramètres',el:$('props'),dock:'right',w:290,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:290,weight:1}]);
+$('winB').onclick=()=>WM.menu($('winB'));$('treeT').onclick=()=>WM.toggleDock('left');$('propT').onclick=()=>WM.toggleDock('right');
 resize();rebuild();fitView();
 </script>
 </body>

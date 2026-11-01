@@ -16,9 +16,9 @@ const DGLib={
   importAll(text){const inc=JSON.parse(text);if(!Array.isArray(inc))throw new Error('Fichier de bibliothèque invalide');const l=load();
     inc.forEach(it=>{if(!l.some(x=>x.id==it.id))l.push(it)});store(l);listeners.forEach(f=>f());return inc.length},
   // Panneau en bas à droite. kind: '2d' ou '3d'. dropTarget: élément où l'on dépose. onDrop(item,x,y)
-  mount(host,kind,dropTarget,onDrop){
+  mount(host,kind,dropTarget,onDrop,opts={}){
     const css=`.dglib{position:absolute;right:8px;bottom:8px;width:270px;max-width:calc(100% - 16px);max-height:48%;display:flex;flex-direction:column;background:#22252cf2;border:1px solid #3d8bff;border-radius:10px;z-index:6;box-shadow:0 6px 24px #0008;font:12px system-ui;color:#e6e7ea}
-.dglib.min{max-height:none}.dglib.min .dgb{display:none}
+.dglib.min{max-height:none}.dglib.emb{position:static;width:auto;max-width:none;max-height:none;height:100%;border:0;border-radius:0;box-shadow:none;background:transparent}.dglib.emb header{display:none}.dglib.emb .dgb{flex:1;min-height:0}.dglib.emb.min .dgb{display:flex}.dglib.min .dgb{display:none}
 .dglib header{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid #363a44;cursor:pointer;user-select:none}
 .dglib header b{flex:1;font-size:13px}.dglib header button,.dglib .dgb button{background:#2f333c;border:1px solid #363a44;color:#e6e7ea;border-radius:6px;padding:2px 7px;cursor:pointer;font:inherit}
 .dgb{display:flex;flex-direction:column;min-height:0}.dgb input{box-sizing:border-box;width:calc(100% - 16px);margin:6px 8px;padding:4px 6px;background:#1b1d23;border:1px solid #363a44;border-radius:6px;color:#e6e7ea;font:inherit}
@@ -31,7 +31,7 @@ const DGLib={
 .dgempty{padding:10px;color:#9aa0ab;line-height:1.4}
 .dgghost{position:fixed;z-index:99;pointer-events:none;width:90px;opacity:.85;border:2px solid #3dff8b;border-radius:8px;background:#15171c;transform:translate(-50%,-50%)}`;
     if(!document.getElementById('dglibcss')){const s=document.createElement('style');s.id='dglibcss';s.textContent=css;document.head.append(s)}
-    const box=document.createElement('div');box.className='dglib';
+    const box=document.createElement('div');box.className='dglib'+(opts.embedded?' emb':'');
     let collapsed=false;try{collapsed=localStorage.getItem('dglib-min-'+kind)=='1'}catch(e){}
     box.innerHTML=`<header><b>📚 Bibliothèque</b><span class="cnt"></span><button class="tg" title="Réduire / agrandir">▾</button></header>
 <div class="dgb"><input class="q" placeholder="Rechercher une pièce…"><div class="dggrid"></div>
