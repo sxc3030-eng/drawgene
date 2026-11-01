@@ -48,7 +48,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
 </head>
 <body>
 <div id="top">
-  <b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v9</small></b>
+  <b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v10</small></b>
   <select id="mode" style="width:auto"><option value="bat">🏠 Bâtiment</option><option value="mec">⚙️ Pièce mécanique</option></select>
   <select id="unit" style="width:auto"><option value="mm">mm</option><option value="m">m</option><option value="po">pi/po</option></select>
   <button id="undo" title="Annuler (Ctrl+Z)">↶</button><button id="redo" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
@@ -56,7 +56,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
   <button id="fit">Ajuster</button><a href="modele3d.html"><button>🧊 3D</button></a>
   <button id="newB">Nouveau</button><button id="saveB">Enregistrer</button><button id="openB">Ouvrir</button>
   <button id="photoB">📷 Photo</button><button id="to3dB">⬆ Vers 3D</button><button id="pngB">PNG</button><button id="dxfB">DXF ⬇</button><button id="dxfI">DXF ⬆</button><button id="csvB">CSV</button><button id="printB">Imprimer</button>
-  <button id="winB" title="Afficher / masquer / réorganiser les fenêtres">🪟 Fenêtres</button><button id="panelB">Panneau</button>
+  <button id="aiB" title="Assistant IA local (Mistral)">🤖 Assistant</button><button id="winB" title="Afficher / masquer / réorganiser les fenêtres">🪟 Fenêtres</button><button id="panelB">Panneau</button>
   <input type="file" id="file" accept=".drawgene,.json,application/json" hidden><input type="file" id="photoF" accept="image/*" hidden><input type="file" id="dxfF" accept=".dxf" hidden>
 </div>
 <div id="main">
@@ -73,6 +73,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
 <script src="lib.js"></script>
 <script src="panels.js"></script>
 <script src="cmenu.js"></script>
+<script src="assistant.js"></script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
@@ -698,6 +699,35 @@ function sendTo3D(){const parts=S.ents.filter(e=>isShape(e)&&e.role=='contour');
   try{localStorage.setItem('planpro3d',JSON.stringify(M))}catch(e){}location.href='modele3d.html'}
 $('to3dB').onclick=sendTo3D;
 
+
+// ---------- Assistant IA local : actions possibles en 2D ----------
+function drawingSummary(){const c={};S.ents.forEach(e=>c[e.type]=(c[e.type]||0)+1);const b=bounds();
+  const L=[`Mode : ${S.mode=='bat'?'bâtiment':'pièce mécanique'}. Unité affichée : ${S.unit}. Coordonnées en mm, X vers la droite, Y vers le HAUT, origine (0,0).`,
+    `Éléments : ${Object.entries(c).map(([k,v])=>v+' '+(ENAME[k]||k)).join(', ')||'aucun'}.`+(b?` Emprise : X ${Math.round(b.x0)} à ${Math.round(b.x1)}, Y ${Math.round(-b.y1)} à ${Math.round(-b.y0)}.`:'')];
+  S.ents.filter(e=>e.type=='room').forEach(r=>{const xs=r.pts.map(p=>p.x),ys=r.pts.map(p=>-p.y);L.push(`- pièce « ${r.name} » ${(polyArea(r.pts)/1e6).toFixed(2)} m², X ${Math.min(...xs)}..${Math.max(...xs)}, Y ${Math.min(...ys)}..${Math.max(...ys)}`)});
+  S.ents.filter(e=>isShape(e)&&e.role=='contour').forEach(e=>L.push(`- contour ${e.type} ${e.name||''} ${fmtA(shapeArea(e))}`));return L.join('\n')}
+const Pw=(x,y)=>({x:+x||0,y:-(+y||0)});
+function addRectWalls(x,y,w,h,t){[[x,y,x+w,y],[x+w,y,x+w,y+h],[x+w,y+h,x,y+h],[x,y+h,x,y]].forEach(([a,b,c,d])=>add({type:'wall',a:Pw(a,b),b:Pw(c,d),t:t||S.cfg.wallT,h:S.cfg.wallH,mat:S.cfg.wallMat}))}
+const AITOOLS=[
+ {name:'ajouter_piece_rectangulaire',label:'Ajouter une pièce',description:'Bâtiment : ajoute une pièce rectangulaire (avec ses 4 murs). Coordonnées du coin bas-gauche en mm.',parameters:{type:'object',properties:{nom:{type:'string'},x_mm:{type:'number'},y_mm:{type:'number'},largeur_mm:{type:'number'},profondeur_mm:{type:'number'},avec_murs:{type:'boolean'},revetement:{type:'string',enum:['plancher','ceramique','beton','aucun']}},required:['largeur_mm','profondeur_mm']},
+  run:a=>{if(S.mode!='bat')setMode('bat');snap0();const x=a.x_mm??0,y=a.y_mm??0,w=a.largeur_mm,h=a.profondeur_mm;if(a.avec_murs!==false)addRectWalls(x,y,w,h);
+    add({type:'room',pts:[Pw(x,y),Pw(x+w,y),Pw(x+w,y+h),Pw(x,y+h)],name:a.nom||'Pièce',floor:a.revetement||'plancher'});linkFreeDims();changed();fit();return `« ${a.nom||'Pièce'} » ${(w*h/1e6).toFixed(2)} m² ajoutée`}},
+ {name:'ajouter_mur',label:'Ajouter un mur',description:'Bâtiment : ajoute un mur droit entre deux points (mm).',parameters:{type:'object',properties:{x1_mm:{type:'number'},y1_mm:{type:'number'},x2_mm:{type:'number'},y2_mm:{type:'number'},epaisseur_mm:{type:'number'},materiau:{type:'string',enum:['ossature','beton','bloc']}},required:['x1_mm','y1_mm','x2_mm','y2_mm']},
+  run:a=>{if(S.mode!='bat')setMode('bat');snap0();add({type:'wall',a:Pw(a.x1_mm,a.y1_mm),b:Pw(a.x2_mm,a.y2_mm),t:a.epaisseur_mm||S.cfg.wallT,h:S.cfg.wallH,mat:a.materiau||S.cfg.wallMat});changed();fit();return'mur ajouté'}},
+ {name:'ajouter_porte_ou_fenetre',label:'Porte / fenêtre',description:'Place une porte ou une fenêtre sur le mur le plus proche du point (mm).',parameters:{type:'object',properties:{type:{type:'string',enum:['porte','fenetre']},x_mm:{type:'number'},y_mm:{type:'number'},largeur_mm:{type:'number'}},required:['type','x_mm','y_mm']},
+  run:a=>{const p=Pw(a.x_mm,a.y_mm);let best=null,bd=1/0;S.ents.forEach(e=>{if(e.type!='wall')return;const r=segDist(p,e.a,e.b);if(r.d<bd){bd=r.d;best={e,t:r.t}}});if(!best)return'aucun mur';const e=best.e,tp=a.type=='porte'?'door':'window';snap0();
+    add({type:tp,p:{x:e.a.x+(e.b.x-e.a.x)*best.t,y:e.a.y+(e.b.y-e.a.y)*best.t},ang:Math.atan2(e.b.y-e.a.y,e.b.x-e.a.x),t:e.t,w:a.largeur_mm||(tp=='door'?810:900),h:tp=='door'?2032:1200,flip:false});changed();return a.type+' ajoutée'}},
+ {name:'creer_forme',label:'Créer une forme',description:'Pièce mécanique : crée un rectangle ou un cercle (contour de pièce ou trou). Position = centre en mm.',parameters:{type:'object',properties:{forme:{type:'string',enum:['rectangle','cercle']},x_mm:{type:'number'},y_mm:{type:'number'},largeur_mm:{type:'number'},hauteur_mm:{type:'number'},diametre_mm:{type:'number'},role:{type:'string',enum:['contour','trou']},materiau:{type:'string'},epaisseur_mm:{type:'number'}},required:['forme']},
+  run:a=>{if(S.mode!='mec')setMode('mec');snap0();const c=Pw(a.x_mm,a.y_mm);let e;
+    if(a.forme=='cercle')e=add({type:'circle',c,r:(a.diametre_mm||10)/2,role:a.role||defRole(c)});else{const w=a.largeur_mm||100,h=a.hauteur_mm||50;e=add({type:'rect',a:{x:c.x-w/2,y:c.y-h/2},b:{x:c.x+w/2,y:c.y+h/2},role:a.role||defRole(c)})}
+    if(e.role=='contour'){e.mat=a.materiau||S.cfg.metal;e.ep=a.epaisseur_mm||S.cfg.ep}changed();fit();return a.forme+' ('+e.role+') créé'}},
+ {name:'liste_materiaux',label:'Liste de matériaux',description:'Donne la liste de matériaux, quantités et coût estimé (ou masse et coût des pièces mécaniques).',parameters:{type:'object',properties:{}},
+  run:()=>{if(S.mode=='bat'){const {items,sum}=computeBat();let t=0;const L=sum.map(s=>s.join(' : '));Object.entries(items).forEach(([k,it])=>{const pr=S.prices[k]??0;t+=pr*it.q;L.push(`${it.lb} : ${Number.isInteger(it.q)?it.q:it.q.toFixed(2)} ${it.u}`)});L.push('Total estimé : '+t.toFixed(2)+' $');return L.join('\n')}
+    return computeMec().map(p=>`${p.name} ×${p.q} : ${p.mat} ép. ${p.ep} mm, ${p.kg.toFixed(3)} kg, ${p.holes} trous, coupe ${Math.round(p.cut)} mm, ${p.cost.toFixed(2)} $`).join('\n')||'aucune pièce'}},
+ {name:'supprimer_selection',label:'Supprimer',description:'Supprime les éléments sélectionnés.',parameters:{type:'object',properties:{}},run:()=>{const n=selEnts().length;deleteSel();return n+' supprimé(s)'}},
+ {name:'decrire_dessin',label:'Lire le dessin',description:'Décrit le dessin actuel (pièces, surfaces, emprise).',parameters:{type:'object',properties:{}},run:()=>drawingSummary()},
+ {name:'annuler',label:'Annuler',description:'Annule la dernière action.',parameters:{type:'object',properties:{}},run:()=>{undo();return'annulé'}}];
+
 // ---------- DXF (AutoCAD, Inventor, SolidWorks...) ----------
 $('dxfB').onclick=()=>{const o=[];const P=(...a)=>o.push(...a);const Y=y=>-y;
   const line=(a,b,L)=>P(0,'LINE',8,L,10,a.x,20,Y(a.y),30,0,11,b.x,21,Y(b.y),31,0);
@@ -758,8 +788,9 @@ try{const o=JSON.parse(localStorage.getItem('planpro')||'null');if(o&&o.ents){S=
 if(S.bg&&S.bg.src)bgImg.src=S.bg.src;
 $('unit').value=S.unit;$('ortho').classList.toggle('on',S.cfg.ortho);$('snapB').classList.toggle('on',S.cfg.snap);
 fixLayers();renderTabs();const libBox=DGLib.mount(document.body,'2d',cv,insertLib,{embedded:true});
-const WM=DGPanels.init('2d',$('main'),$('stage'),[{id:'tools',title:'Outils',el:$('tools'),dock:'left',w:64},{id:'side',title:'Propriétés',el:$('side'),dock:'right',w:300,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:300,weight:1}]);
-$('winB').onclick=()=>WM.menu($('winB'));$('panelB').onclick=()=>WM.toggleDock('right');
+const aiBox=DGAssist.mount('2d',AITOOLS,drawingSummary);
+const WM=DGPanels.init('2d',$('main'),$('stage'),[{id:'tools',title:'Outils',el:$('tools'),dock:'left',w:64},{id:'side',title:'Propriétés',el:$('side'),dock:'right',w:300,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:300,weight:1},{id:'ai',title:'🤖 Assistant',el:aiBox,dock:'float',x:80,y:Math.max(120,innerHeight-90),w:340,h:420,min:true}]);
+$('winB').onclick=()=>WM.menu($('winB'));$('aiB').onclick=()=>{const p=WM.panels.ai;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('panelB').onclick=()=>WM.toggleDock('right');
 setMode(S.mode);renderCfg();resize();S.ents.forEach(e=>{if(e.id>=nid)nid=e.id+1});
 if(!S.ents.length)exampleHouse();else fit();renderProps();
 </script>

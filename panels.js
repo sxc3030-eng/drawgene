@@ -31,7 +31,7 @@ const DGPanels={
     const hintL=document.createElement('div'),hintR=document.createElement('div');hintL.className=hintR.className='dghint';hintL.style.left='0';hintR.style.right='0';document.body.append(hintL,hintR);
     const save=()=>{const o={_dw:dockW};Object.values(P).forEach(p=>o[p.id]={mode:p.mode,x:p.x,y:p.y,w:p.w,h:p.h,min:p.min,hidden:p.hidden,order:p.order,weight:p.weight});try{localStorage.setItem(KEY,JSON.stringify(o))}catch(e){}};
     const fire=()=>{requestAnimationFrame(()=>dispatchEvent(new Event('resize')))};
-    defs.forEach((d,i)=>{const s=st[d.id]||{};const p={id:d.id,title:d.title,el:d.el,def:d,mode:s.mode||d.dock||'right',x:s.x??d.x??120,y:s.y??d.y??80,w:s.w||d.w||280,h:s.h||d.h||360,min:!!s.min,hidden:!!s.hidden,order:s.order??i,weight:s.weight||d.weight||1};
+    defs.forEach((d,i)=>{const s=st[d.id]||{};const p={id:d.id,title:d.title,el:d.el,def:d,mode:s.mode||d.dock||'right',x:s.x??d.x??120,y:s.y??d.y??80,w:s.w||d.w||280,h:s.h||d.h||360,min:!!(s.min??d.min),hidden:!!s.hidden,order:s.order??i,weight:s.weight||d.weight||1};
       const w=document.createElement('div');w.className='dgp';w.innerHTML=`<div class="dgph" title="Glisser pour déplacer · vers un bord pour ancrer"><span class="ttl"></span><button class="mb" title="Réduire">–</button><button class="lb" title="Ancrer à gauche">◧</button><button class="fb" title="Fenêtre flottante">⧉</button><button class="rb" title="Ancrer à droite">◨</button><button class="xb" title="Fermer (réouvrir avec 🪟 Fenêtres)">✕</button></div><div class="dgpb"></div>`;
       w.querySelector('.ttl').textContent=d.title;w.querySelector('.dgpb').append(d.el);p.win=w;P[d.id]=p;
       const hd=w.querySelector('.dgph');
@@ -64,7 +64,7 @@ const DGPanels={
         sp.onpointerdown=e=>{e.preventDefault();const sx=e.clientX,w0=dockW[side];const mv=ev=>{const dx=ev.clientX-sx;dockW[side]=Math.max(56,Math.min(innerWidth*.6,w0+(side=='left'?dx:-dx)));d.style.width=dockW[side]+'px';d.querySelectorAll('.dgp').forEach(x=>x.classList.toggle('narrow',dockW[side]<130));fire()};
           const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);save();fire()};addEventListener('pointermove',mv);addEventListener('pointerup',up)}});
       Object.values(P).filter(p=>p.mode=='float'&&!p.hidden).forEach(p=>{const w=p.win;w.className='dgp float'+(p.min?' min':'')+(p.w<130?' narrow':'');
-        w.style.cssText=`left:${Math.min(Math.max(0,p.x),innerWidth-80)}px;top:${Math.min(Math.max(0,p.y),innerHeight-40)}px;width:${p.w}px;${p.min?'':'height:'+p.h+'px;'}z-index:${++z}`;if(w.parentNode!==document.body)document.body.append(w)});
+        if(!p.min){p.h=Math.min(p.h,innerHeight-60);p.y=Math.min(p.y,innerHeight-p.h-6)}w.style.cssText=`left:${Math.min(Math.max(0,p.x),innerWidth-80)}px;top:${Math.min(Math.max(0,p.y),innerHeight-40)}px;width:${p.w}px;${p.min?'':'height:'+p.h+'px;'}z-index:${++z}`;if(w.parentNode!==document.body)document.body.append(w)});
       Object.values(P).filter(p=>p.hidden).forEach(p=>p.win.remove());save();fire()}
     layout();
     const api={layout,
