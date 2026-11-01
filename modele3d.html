@@ -50,7 +50,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
   <button id="undoB">↶</button><button id="redoB">↷</button>
   <button id="newB">Nouveau</button><button id="saveB">Enregistrer</button><button id="openB">Ouvrir</button><button id="impB">📥 Importer STEP/IGES/STL/OBJ</button><button id="stlB">Export STL</button><button id="objB">Export OBJ</button><button id="pngB">PNG</button>
   <button id="treeT">Arbre</button><button id="propT">Param.</button>
-  <input type="file" id="file" accept=".json" hidden><input type="file" id="impF" accept=".step,.stp,.iges,.igs,.stl,.obj,.brep" multiple hidden>
+  <input type="file" id="file" accept=".drawgene,.json" hidden><input type="file" id="impF" accept=".step,.stp,.iges,.igs,.stl,.obj,.brep" multiple hidden>
 </div>
 <div id="main">
   <div id="tree"></div>
@@ -62,6 +62,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="lib.js"></script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
@@ -129,12 +130,16 @@ function resize(){const r=view.getBoundingClientRect();R.setSize(r.width,r.heigh
 addEventListener('resize',resize);
 (function loop(){requestAnimationFrame(loop);ctl.update();try{placeLabels()}catch(e){}R.render(scene,cam)})();
 
-function rebuild(){group.clear();let tot={kg:0,vol:0,n:0};const info=[];
-  bodies().forEach(f=>{if(!f.on)return;let g;try{g=buildGeom(f)}catch(e){g=null}if(!g){info.push(f.name+' : profil invalide');return}
-    const selF=fid(sel),isSel=sel==f.id||(selF&&selF.parent==f.id);
+const comps=()=>M.comps||(M.comps=[]);const compOf=id=>comps().find(c=>c.id==id);const selComp=()=>typeof sel=='string'&&sel[0]=='c'?compOf(+sel.slice(1)):null;
+const D2R=Math.PI/180;
+function rebuild(){group.clear();let tot={kg:0,vol:0,n:0};const info=[];const CG={};
+  comps().forEach(c=>{const g=new THREE.Group();g.position.set(c.x||0,c.y||0,c.z||0);g.rotation.set((c.rx||0)*D2R,(c.ry||0)*D2R,(c.rz||0)*D2R);g.userData.comp=c.id;CG[c.id]=g;group.add(g)});
+  const sc=selComp();
+  bodies().forEach(f=>{if(!f.on)return;const tgt=f.comp&&CG[f.comp]?CG[f.comp]:group;let g;try{g=buildGeom(f)}catch(e){g=null}if(!g){info.push(f.name+' : profil invalide');return}
+    const selF=fid(sel),isSel=sel==f.id||(selF&&selF.parent==f.id)||(sc&&f.comp==sc.id);
     const mat=new THREE.MeshStandardMaterial({color:COLORS[f.mat]||0xaaaaaa,metalness:['bois','pvc','acrylique','beton'].includes(f.mat)?0:.55,roughness:.45,wireframe:wire,emissive:isSel?0x3d5fa0:0,transparent:f.mat=='acrylique',opacity:f.mat=='acrylique'?.6:1,side:THREE.DoubleSide});
-    const m=new THREE.Mesh(g,mat);m.userData.id=f.id;group.add(m);
-    if(edges&&!wire)group.add(new THREE.LineSegments(new THREE.EdgesGeometry(g,25),new THREE.LineBasicMaterial({color:isSel?0xffb020:0x111111})));
+    const m=new THREE.Mesh(g,mat);m.userData.id=f.id;m.userData.comp=f.comp||null;tgt.add(m);
+    if(edges&&!wire)tgt.add(new THREE.LineSegments(new THREE.EdgesGeometry(g,25),new THREE.LineBasicMaterial({color:isSel?0xffb020:0x111111})));
     const v=volume(g),kg=v*1e-9*DENS[f.mat]*(f.qty||1);f._v=v;f._a=area(g);f._kg=v*1e-9*DENS[f.mat];g.computeBoundingBox();f._bb=g.boundingBox;tot.kg+=kg;tot.vol+=v*(f.qty||1);tot.n+=f.qty||1});
   if(house)group.add(house);
   imports.forEach(im=>{group.add(im.mesh);if(edges&&!wire)group.add(im.edges);im.mesh.material.wireframe=wire;tot.kg+=im.kg;tot.vol+=im.vol;tot.n++});
@@ -145,15 +150,31 @@ function rebuild(){group.clear();let tot={kg:0,vol:0,n:0};const info=[];
 const ICON={extrude:'⬆',revolve:'🔄',hole:'🕳',cut:'✂'};
 function renderTree(){const T=$('tree');let h='<h4>Arbre du modèle</h4><div class="it" style="cursor:default">📦 PIECE.prt</div>';
   ['XY','XZ','YZ'].forEach(p=>h+=`<div class="it sub" style="cursor:default;color:#9aa0ab">▱ Plan ${p}</div>`);
-  bodies().forEach(f=>{h+=`<div class="it sub ${f.id==sel?'sel':''} ${f.on?'':'off'}" data-id="${f.id}">${ICON[f.type]} ${f.name}</div>`;
-    M.feats.filter(x=>x.parent==f.id).forEach(x=>h+=`<div class="it sub ${x.id==sel?'sel':''} ${x.on?'':'off'}" data-id="${x.id}" style="margin-left:36px">${ICON[x.type]} ${x.name}</div>`)});
+  const E=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const bl=(f,ind)=>{h+=`<div class="it sub ${f.id==sel?'sel':''} ${f.on?'':'off'}" data-id="${f.id}" style="margin-left:${ind}px">${ICON[f.type]} ${E(f.name)}</div>`;
+    M.feats.filter(x=>x.parent==f.id).forEach(x=>h+=`<div class="it sub ${x.id==sel?'sel':''} ${x.on?'':'off'}" data-id="${x.id}" style="margin-left:${ind+18}px">${ICON[x.type]} ${E(x.name)}</div>`)};
+  bodies().filter(f=>!f.comp).forEach(f=>bl(f,18));
+  if(comps().length)h+='<h4>Assemblage</h4>';
+  comps().forEach(c=>{h+=`<div class="it ${sel=='c'+c.id?'sel':''}" data-c="${c.id}">🧩 ${E(c.name)}</div>`;bodies().filter(f=>f.comp==c.id).forEach(f=>bl(f,30))});
   if(house)h+='<div class="it sub">🏠 Maison (depuis plan)</div>';
   imports.forEach((im,i)=>h+=`<div class="it sub" title="Pièce importée">📥 ${im.name} <button data-rm="${i}" style="margin-left:auto;padding:0 6px">✕</button></div>`);
   if(!M.feats.length&&!house)h+='<p class="note">Ajoutez une fonction avec les boutons du haut : Extrusion, Révolution, puis Trou / Enlèvement dans une extrusion.</p>';
-  T.innerHTML=h;T.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{imports.splice(+b.dataset.rm,1);rebuild()});T.querySelectorAll('[data-id]').forEach(e=>e.onclick=()=>{sel=+e.dataset.id;rebuild()})}
+  T.innerHTML=h;T.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{imports.splice(+b.dataset.rm,1);rebuild()});T.querySelectorAll('[data-id]').forEach(e=>e.onclick=()=>{sel=+e.dataset.id;rebuild()});T.querySelectorAll('[data-c]').forEach(e=>e.onclick=()=>{sel='c'+e.dataset.c;rebuild()})}
 
 // ---------- Paramètres ----------
-function renderProps(){const P=$('props'),f=fid(sel);
+function renderProps(){const P=$('props'),f=fid(sel),c=selComp();
+  if(c){const fs=bodies().filter(b=>b.comp==c.id),kg=fs.reduce((s,b)=>s+(b._kg||0)*(b.qty||1),0);
+    P.innerHTML=`<h4>🧩 Composant</h4><div class="f"><span>Nom</span><input id="cN"></div>
+    ${[['X (mm)','x'],['Y (mm)','y'],['Z (mm)','z'],['Rotation X (°)','rx'],['Rotation Y (°)','ry'],['Rotation Z (°)','rz']].map(([l,k])=>`<div class="f"><span>${l}</span><input data-k="${k}" value="${+(c[k]||0).toFixed(2)}"></div>`).join('')}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0"><button data-r="ry">↻ 90° Y</button><button data-r="rx">↻ 90° X</button><button data-r="rz">↻ 90° Z</button><button id="cG">⤓ Poser au sol</button></div>
+    <p class="note">Glissez la pièce dans la vue 3D pour la déplacer (Maj = monter/descendre). ${fs.length} corps · ${kg.toFixed(3)} kg</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><button id="cD">Dupliquer</button><button id="cX">🗑 Supprimer</button></div>`;
+    $('cN').value=c.name;$('cN').onchange=()=>{snap();c.name=$('cN').value||c.name;rebuild()};
+    P.querySelectorAll('[data-k]').forEach(i=>i.onchange=()=>{const v=parseFloat(i.value.replace(',','.'));if(isFinite(v)){snap();c[i.dataset.k]=v}rebuild()});
+    P.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{snap();c[b.dataset.r]=((c[b.dataset.r]||0)+90)%360;rebuild()});
+    $('cG').onclick=()=>{snap();const g=group.children.find(o=>o.userData.comp==c.id);if(g){const b=new THREE.Box3().setFromObject(g);c.y=(c.y||0)-b.min.y}rebuild()};
+    $('cX').onclick=()=>{snap();M.feats=M.feats.filter(b=>b.comp!=c.id);M.comps=comps().filter(x=>x!==c);sel=null;rebuild()};
+    $('cD').onclick=()=>{snap();const nc={...c,id:M.nid++,name:c.name+' (copie)',x:(c.x||0)+30};comps().push(nc);copyFeats(M.feats.filter(b=>b.comp==c.id),nc.id);sel='c'+nc.id;rebuild()};return}
   if(!f){P.innerHTML=`<h4>Paramètres</h4><p class="note">Sélectionnez une fonction dans l'arbre ou cliquez sur une pièce en 3D.<br><br>
   <b>Comme Pro/E :</b> chaque fonction garde ses cotes. Changez une valeur → la pièce est régénérée.<br><br>
   • <b>Extrusion</b> : profil (rectangle avec congés, cercle, polygone) + profondeur.<br>• <b>Révolution</b> : profil « rayon,hauteur » tourné autour de l'axe.<br>
@@ -200,12 +221,20 @@ function massTable(){const b=bodies().filter(f=>f.on&&f._kg!=null);if(!b.length&
 
 // ---------- Sélection 3D ----------
 const ray=new THREE.Raycaster();let down=null;
-R.domElement.addEventListener('pointerdown',e=>down={x:e.clientX,y:e.clientY});
+R.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};const c=selComp();if(!c||measuring)return;
+  const r=R.domElement.getBoundingClientRect();ray.setFromCamera({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1},cam);
+  const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh&&x.object.userData.comp==c.id);if(!h.length)return;
+  ctl.enabled=false;snap();const p0=h[0].point.clone(),vert=e.shiftKey,n=vert?cam.getWorldDirection(new THREE.Vector3()).setY(0).normalize():new THREE.Vector3(0,1,0);
+  const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(n,p0),st={x:c.x||0,y:c.y||0,z:c.z||0},q=new THREE.Vector3(),g=group.children.find(o=>o.userData.comp==c.id);let moved=false;
+  const mv=ev=>{ray.setFromCamera({x:(ev.clientX-r.left)/r.width*2-1,y:-(ev.clientY-r.top)/r.height*2+1},cam);if(!ray.ray.intersectPlane(plane,q))return;const d=q.sub(p0),sn=v=>Math.round(v);moved=true;
+    if(vert)c.y=sn(st.y+d.y);else{c.x=sn(st.x+d.x);c.z=sn(st.z+d.z)}if(g)g.position.set(c.x,c.y,c.z);$('info').textContent=`🧩 ${c.name}  X ${c.x}  Y ${c.y}  Z ${c.z} mm`};
+  const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);ctl.enabled=true;if(moved){down=null;rebuild()}else undoS.pop()};
+  addEventListener('pointermove',mv);addEventListener('pointerup',up)});
 R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down.x,e.clientY-down.y)>4)return;const r=R.domElement.getBoundingClientRect();
   ray.setFromCamera({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1},cam);
   const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh);
   if(measuring){if(!h.length)return;measurePick(h[0]);return}
-  sel=h.length?h[0].object.userData.id||null:null;rebuild()});
+  const o=h.length?h[0].object:null;sel=o?(o.userData.comp?'c'+o.userData.comp:o.userData.id||null):null;rebuild()});
 // ---------- Mesure 3D ----------
 let measuring=false,mA=null;const mG=new THREE.Group();scene.add(mG);const measures=[];
 function measurePick(hit){let p=hit.point.clone();const o=hit.object,f=hit.face,pos=o.geometry.attributes.position,tol=bbox().getSize(new THREE.Vector3()).length()*0.02;
@@ -247,10 +276,35 @@ $('houseB').onclick=()=>{let P;try{P=JSON.parse(localStorage.getItem('planpro')|
 
 // ---------- Fichiers ----------
 function download(name,data,type){const a=document.createElement('a');a.download=name;a.href=data.startsWith&&data.startsWith('data:')?data:URL.createObjectURL(new Blob([data],{type}));a.click()}
-$('saveB').onclick=()=>download('piece.prt.json',JSON.stringify(M,(k,v)=>k.startsWith('_')?undefined:v,1),'application/json');
+const cleanM=()=>JSON.parse(JSON.stringify(M,(k,v)=>k.startsWith('_')?undefined:v));
+function thumb3D(){setView('iso');R.render(scene,cam);const c=document.createElement('canvas');c.width=200;c.height=150;const s=R.domElement,k=Math.max(s.width/200,s.height/150);
+  c.getContext('2d').fillStyle='#1a1d23';c.getContext('2d').fillRect(0,0,200,150);c.getContext('2d').drawImage(s,(200-s.width/k)/2,(150-s.height/k)/2,s.width/k,s.height/k);return c.toDataURL('image/jpeg',.8)}
+function saveToLib(name){return DGLib.add({kind:'3d',name,data:cleanM(),thumb:thumb3D()})}
+$('saveB').onclick=()=>{if(!bodies().length){alert('Rien à enregistrer : aucune pièce.');return}const n=prompt('Nom de la pièce / de l\'assemblage :',M.name||'Pièce');if(!n)return;M.name=n.trim();save();
+  saveToLib(M.name);download(M.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\\/:*?"<>|]+/g,'_')+'.drawgene',JSON.stringify(cleanM(),null,1),'application/json');$('info').textContent='💾 « '+M.name+' » enregistré et ajouté à la bibliothèque'};
+function copyFeats(src,compId){const map={};src.forEach(f=>map[f.id]=M.nid++);
+  M.feats.filter(f=>src.some(s=>s.parent&&s.parent==f.id));const out=[];
+  src.forEach(f=>{const c=JSON.parse(JSON.stringify(f));c.id=map[f.id];if(c.parent!=null)c.parent=map[c.parent]??c.parent;if(c.type=='extrude'||c.type=='revolve')c.comp=compId;else delete c.comp;out.push(c)});
+  M.feats.push(...out);return out}
+function insert3D(it,cx,cy){const d=it.data;if(!d||!d.feats||!d.feats.length)return;const r=R.domElement.getBoundingClientRect();
+  ray.setFromCamera({x:(cx-r.left)/r.width*2-1,y:-(cy-r.top)/r.height*2+1},cam);const q=new THREE.Vector3();if(!ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),q))q.set(0,0,0);
+  const saved=M;M={feats:d.feats,comps:d.comps||[]};const bb=new THREE.Box3();
+  d.feats.filter(f=>(f.type=='extrude'||f.type=='revolve')&&f.on!==false).forEach(f=>{try{const g=buildGeom(f);if(g){g.computeBoundingBox();bb.union(g.boundingBox)}}catch(e){}});M=saved;
+  if(bb.isEmpty())bb.set(new THREE.Vector3(),new THREE.Vector3());const ctr=bb.getCenter(new THREE.Vector3());
+  snap();const c={id:M.nid++,name:it.name,x:Math.round(q.x-ctr.x),y:Math.round(-bb.min.y),z:Math.round(q.z-ctr.z),rx:0,ry:0,rz:0};comps().push(c);
+  copyFeats(d.feats.map(f=>{const g={...f};delete g.comp;return g}),c.id);sel='c'+c.id;rebuild();if(bodies().length==bodies().filter(b=>b.comp==c.id).length)fitView();
+  $('info').textContent='🧩 « '+it.name+' » ajouté — glissez-le dans la vue pour le placer'}
 $('openB').onclick=()=>$('file').click();
-$('file').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const o=JSON.parse(t);if(!o.feats)throw 0;snap();M=o;sel=null;rebuild();fitView()}catch(x){alert('Fichier invalide')}});e.target.value=''};
-$('newB').onclick=()=>{if(!confirm('Nouvelle pièce ?'))return;snap();M={feats:[],nid:1};sel=null;house=null;rebuild();fitView()};
+function openText(t,fname){let o;try{o=JSON.parse(t)}catch(x){alert('Ce fichier n\'est pas un dessin drawGene.');return}
+  if(o.ents){try{localStorage.setItem('planpro',JSON.stringify(o))}catch(e){}location.href='plan.html';return}
+  if(!o.feats){alert('Ce fichier n\'est pas un dessin drawGene.');return}snap();M=o;if(!M.name&&fname)M.name=fname.replace(/\.(drawgene|json)$/i,'').replace(/\.prt$/i,'');sel=null;rebuild();fitView();
+  if(bodies().length)saveToLib(M.name||'Pièce'),fitView()}
+$('file').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>openText(t,f.name));e.target.value=''};
+if('launchQueue' in window)launchQueue.setConsumer(async p=>{if(p.files&&p.files.length){const f=await p.files[0].getFile();openText(await f.text(),f.name)}});
+view.addEventListener('dragover',e=>e.preventDefault());
+view.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files&&e.dataTransfer.files[0];if(!f)return;
+  if(/\.(step|stp|iges|igs|stl|obj|brep)$/i.test(f.name)){importFile(f).then(()=>{rebuild();fitView()}).catch(x=>alert(f.name+' : '+x.message));return}f.text().then(t=>openText(t,f.name))});
+$('newB').onclick=()=>{if(!confirm('Nouvelle pièce ?'))return;snap();M={feats:[],nid:1,comps:[]};sel=null;house=null;rebuild();fitView()};
 $('undoB').onclick=()=>{if(!undoS.length)return;redoS.push(JSON.stringify(M));M=JSON.parse(undoS.pop());rebuild()};
 $('redoB').onclick=()=>{if(!redoS.length)return;undoS.push(JSON.stringify(M));M=JSON.parse(redoS.pop());rebuild()};
 $('pngB').onclick=()=>{R.render(scene,cam);download('piece.png',R.domElement.toDataURL('image/png'))};
@@ -300,6 +354,7 @@ function example(){M={feats:[],nid:1};const A=(f)=>{f.id=M.nid++;M.feats.push(f)
   A({type:'hole',name:'Alésage central',parent:b.id,d:30,u:0,v:0,pattern:'none',n:1,du:0,dv:0,pr:0,on:true});
   A({type:'revolve',name:'Moyeu',plane:'XY',pts:'15,12; 28,12; 28,45; 22,50; 15,50',angle:360,x:0,y:0,z:0,mat:'acier',qty:1,on:true})}
 try{const o=JSON.parse(localStorage.getItem('planpro3d')||'null');if(o&&o.feats&&o.feats.length)M=o;else example()}catch(e){example()}
+DGLib.mount(view,'3d',R.domElement,insert3D);
 resize();rebuild();fitView();
 </script>
 </body>
