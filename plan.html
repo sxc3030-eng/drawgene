@@ -13,6 +13,7 @@
 html,body{height:100%;background:var(--bg);color:var(--txt);font:13px system-ui,sans-serif;overflow:hidden}
 #top{height:46px;display:flex;align-items:center;gap:5px;padding:0 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto}
 #top b{margin-right:6px;white-space:nowrap;font-size:14px}
+#top .lia{background:linear-gradient(135deg,#ff6fbf,#7b4dff);border:0;color:#fff;font-weight:700;padding:6px 12px;border-radius:18px}#top .dgmb{font-weight:600}
 button,select,input{font:inherit;color:var(--txt)}
 button{background:#2f333c;border:1px solid var(--line);border-radius:7px;padding:5px 9px;cursor:pointer;white-space:nowrap}
 button.on{background:var(--acc);border-color:var(--acc)}
@@ -48,15 +49,15 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
 </head>
 <body>
 <div id="top">
-  <b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v11</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v12</small></b>
   <select id="mode" style="width:auto"><option value="bat">🏠 Bâtiment</option><option value="mec">⚙️ Pièce mécanique</option></select>
   <select id="unit" style="width:auto"><option value="mm">mm</option><option value="m">m</option><option value="po">pi/po</option></select>
   <button id="undo" title="Annuler (Ctrl+Z)">↶</button><button id="redo" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
   <button id="ortho" title="F8">Ortho</button><button id="snapB" class="on" title="F9">Aimant</button>
   <button id="fit">Ajuster</button><a href="modele3d.html"><button>🧊 3D</button></a>
-  <button id="newB">Nouveau</button><button id="saveB">Enregistrer</button><button id="openB">Ouvrir</button>
-  <button id="photoB">📷 Photo</button><button id="to3dB">⬆ Vers 3D</button><button id="pngB">PNG</button><button id="dxfB">DXF ⬇</button><button id="dxfI">DXF ⬆</button><button id="csvB">CSV</button><button id="printB">Imprimer</button>
-  <button id="aiB" title="Lia, votre assistante IA (intégrée, sans internet)">👩 Lia</button><button id="winB" title="Afficher / masquer / réorganiser les fenêtres">🪟 Fenêtres</button><button id="panelB">Panneau</button>
+  <span id="tbEnd"></span><button id="newB">📄 Nouveau</button><button id="saveB">💾 Enregistrer</button><button id="openB">📂 Ouvrir</button>
+  <button id="photoB">📷 Photo de référence</button><button id="to3dB">⬆ Envoyer la pièce en 3D</button><button id="pngB">🖼 Exporter une image PNG</button><button id="dxfB">⬇ Exporter en DXF (AutoCAD)</button><button id="dxfI">⬆ Importer un DXF</button><button id="csvB">📊 Liste de matériaux (CSV)</button><button id="printB">🖨 Imprimer</button>
+  <button id="winB">🪟 Fenêtres…</button><button id="panelB">◨ Panneau de droite</button>
   <input type="file" id="file" accept=".drawgene,.json,application/json" hidden><input type="file" id="photoF" accept="image/*" hidden><input type="file" id="dxfF" accept=".dxf" hidden>
 </div>
 <div id="main">
@@ -788,9 +789,14 @@ try{const o=JSON.parse(localStorage.getItem('planpro')||'null');if(o&&o.ents){S=
 if(S.bg&&S.bg.src)bgImg.src=S.bg.src;
 $('unit').value=S.unit;$('ortho').classList.toggle('on',S.cfg.ortho);$('snapB').classList.toggle('on',S.cfg.snap);
 fixLayers();renderTabs();const libBox=DGLib.mount(document.body,'2d',cv,insertLib,{embedded:true});
-const aiBox=DGAssist.mount('2d',AITOOLS,drawingSummary);
-const WM=DGPanels.init('2d',$('main'),$('stage'),[{id:'tools',title:'Outils',el:$('tools'),dock:'left',w:64},{id:'side',title:'Propriétés',el:$('side'),dock:'right',w:300,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:300,weight:1},{id:'ai',title:'👩 Lia — assistante',el:aiBox,dock:'float',x:80,y:Math.max(120,innerHeight-90),w:340,h:420,min:true}]);
-$('winB').onclick=()=>WM.menu($('winB'));$('aiB').onclick=()=>{const p=WM.panels.ai;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('panelB').onclick=()=>WM.toggleDock('right');
+const tb=t=>()=>document.querySelector('#tools [data-t="'+t+'"]'),tabB=t=>()=>document.querySelector('#tabs [data-p="'+t+'"]');
+const aiBox=DGAssist.mount('2d',AITOOLS,drawingSummary,{'Sélection':tb('select'),'Mur':tb('wall'),'Porte':tb('door'),'Fenêtre':tb('window'),'Pièce':tb('room'),'Ligne':tb('line'),'Rectangle':tb('rect'),'Cercle':tb('circle'),'Polygone':tb('poly'),'Cote':tb('dim'),'Texte':tb('text'),'Mesure':tb('measure'),'Échelle photo':tb('calib'),'Redresser photo':tb('rectify'),'Déplacer la vue':tb('pan'),
+  'Menu Fichier (Nouveau, Ouvrir, Enregistrer, exporter)':'.dgmb','Annuler':'#undo','Rétablir':'#redo','Supprimer':'#delSel','Ortho':'#ortho','Aimant':'#snapB','Ajuster la vue':'#fit','Passer en 3D':'a[href="modele3d.html"] button','Mode bâtiment / pièce':'#mode','Unités':'#unit',
+  'Calques':'#ltabs','Ajouter un calque':()=>[...document.querySelectorAll('#ltabs .tb')].find(x=>/Calque/.test(x.textContent)&&/＋/.test(x.textContent)),'Propriétés':tabB('props'),'Matériaux et coûts':tabB('mat'),'Réglages':tabB('cfg'),'Bibliothèque':'.dglib'});
+const WM=DGPanels.init('2d',$('main'),$('stage'),[{id:'tools',title:'Outils',el:$('tools'),dock:'left',w:64},{id:'side',title:'Propriétés',el:$('side'),dock:'right',w:300,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:300,weight:1},{id:'lia',title:'👩 Lia — votre assistante',el:aiBox,dock:'float',x:Math.max(80,innerWidth-310-360),y:Math.max(60,innerHeight-Math.min(470,innerHeight-110)-12),w:350,h:Math.min(470,innerHeight-110)}]);
+DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, exporter',['newB','openB','saveB','-','photoB','pngB','dxfB','dxfI','csvB','printB'],$('tbEnd'));
+const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['to3dB','winB','panelB'],$('tbEnd'));
+$('winB').onclick=()=>WM.menu(plusB);$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('panelB').onclick=()=>WM.toggleDock('right');
 setMode(S.mode);renderCfg();resize();S.ents.forEach(e=>{if(e.id>=nid)nid=e.id+1});
 if(!S.ents.length)exampleHouse();else fit();renderProps();
 </script>

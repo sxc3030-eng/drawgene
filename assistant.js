@@ -5,7 +5,8 @@
 const WEBLLM='https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.85/+esm';
 const MODELS={'Ministral-3-3B-Instruct-2512-BF16-q4f16_1-MLC':'Ministral 3B (Mistral) — léger, ≈ 2 Go · conseillé','Mistral-7B-Instruct-v0.3-q4f16_1-MLC':'Mistral 7B — plus intelligent, ≈ 4 Go · PC puissant','Llama-3.2-3B-Instruct-q4f16_1-MLC':'Llama 3.2 3B — léger, ≈ 2 Go'};
 const DEF_MODEL='Ministral-3-3B-Instruct-2512-BF16-q4f16_1-MLC';
-const css=`.dga{display:flex;flex-direction:column;height:100%;min-height:0;font:13px system-ui;color:#e6e7ea}
+const css=`.dgp.float:has(.dga){min-width:340px;min-height:420px}.dgdock .dgp:has(.dga){min-height:300px}
+.dga{display:flex;flex-direction:column;height:100%;min-height:0;font:13px system-ui;color:#e6e7ea}
 .dga .st{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid #363a44;font-size:11px;color:#9aa0ab}
 .dga .av{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:17px;background:radial-gradient(circle at 30% 30%,#ff9ad5,#7b4dff);box-shadow:0 0 0 2px #22252c,0 0 0 3px #b07bff}
 .dga .av.talk{animation:dgapulse .8s ease-in-out infinite alternate}@keyframes dgapulse{to{box-shadow:0 0 0 2px #22252c,0 0 0 7px #b07bff66}}
@@ -30,13 +31,15 @@ function cfg(){let c={};try{c=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(
 function saveCfg(p){try{localStorage.setItem(KEY,JSON.stringify({...cfg(),...p}))}catch(e){}}
 const PERSONA=`Tu t'appelles Lia. Tu es l'assistante intégrée de drawGene, un logiciel de dessin technique (plans de maison et pièces mécaniques, 2D et 3D) pensé par Eugene, un technicien québécois. Tu parles à la première personne, au féminin ("je suis prête", "je l'ai ajouté"), avec chaleur et simplicité.
 Réponds TOUJOURS en français, en 1 à 3 phrases courtes (tes réponses sont lues à voix haute). Unités internes : millimètres (1 po = 25,4 mm, 1 pi = 304,8 mm, 16 po c/c = 406 mm).
-Quand on te demande de créer, modifier, supprimer ou calculer quelque chose dans le dessin, utilise une action au lieu d'expliquer. S'il manque une dimension, choisis une valeur raisonnable et dis-le.
+Quand on te demande de créer, modifier, supprimer ou calculer quelque chose dans le dessin, fais-le avec une action. Si la personne veut apprendre (« comment », « montre-moi », « où est »), utilise l'action montrer pour faire clignoter le bon bouton, puis explique en une phrase. S'il manque une dimension, choisis une valeur raisonnable et dis-le.
 Aide sur drawGene : clic droit = menu (supprimer, copier, annuler) ; Suppr efface ; Ctrl+Z annule ; Ctrl+C/Ctrl+V copier-coller. 2D : outils à gauche, taper une longueur puis Entrée pendant un tracé, glisser dans le vide = sélection par rectangle, cliquer une cote bleue = la modifier et le dessin s'ajuste, calques en onglets, onglet Matériaux = coûts. 3D : Extrusion, Révolution, Trou ; 🪵 Bois ajoute 2x4/2x6/contreplaqué ; flèches colorées pour déplacer ; poignées pour étirer ; étiquettes bleues = cotes ; 🔗 Contrainte ; 📋 Liste de coupe ; ⬚ Zone ; 🔒 verrouiller. Enregistrer met la pièce dans la 📚 Bibliothèque, on la glisse dans un dessin pour assembler.`;
 function speakable(t){return t.replace(/```[\s\S]*?```/g,'').replace(/[*_#`>|]/g,'').replace(/×/g,' par ').replace(/Ø/g,'diamètre ').replace(/\bmm\b/g,'millimètres').replace(/m²/g,'mètres carrés').replace(/\bpo\b/g,'pouces').replace(/\bpi\b/g,'pieds').trim()}
 function pickVoice(){const V=speechSynthesis.getVoices().filter(v=>/^fr/i.test(v.lang));const fem=/sylvie|caroline|denise|hortense|julie|am[ée]lie|chantal|marie|audrey|female|femme|elsa|brigitte|vivienne|eloise|celine|l[ée]a/i;
   return V.find(v=>/fr-CA/i.test(v.lang)&&fem.test(v.name))||V.find(v=>fem.test(v.name))||V.find(v=>/fr-CA/i.test(v.lang))||V[0]||null}
 window.DGAssist={
-  mount(app,tools,context){if(!document.getElementById('dgacss')){const s=document.createElement('style');s.id='dgacss';s.textContent=css;document.head.append(s)}
+  mount(app,tools,context,guide){guide=guide||{};
+    if(Object.keys(guide).length)tools=[...tools,{name:'montrer',label:'Montrer',description:'Montre à l\'utilisateur où se trouve un bouton ou un outil en le faisant clignoter (à utiliser quand il veut apprendre ou dit « montre-moi »).',parameters:{type:'object',properties:{element:{type:'string',enum:Object.keys(guide)}},required:['element']},
+      run:x=>{const g=guide[x.element];if(!g)return'élément inconnu';const el=typeof g=='function'?g():document.querySelector(g);return DGMenu.flash(el)?'le bouton « '+x.element+' » clignote à l\'écran':'élément introuvable'}}];if(!document.getElementById('dgacss')){const s=document.createElement('style');s.id='dgacss';s.textContent=css;document.head.append(s)}
     const box=document.createElement('div');box.className='dga';
     box.innerHTML=`<div class="st"><span class="av">👩</span><span class="who"><b>Lia</b><span class="stt"><span class="dot"></span>…</span></span><button class="vo" title="Voix de Lia (lecture à voix haute)">🔊</button><button class="cf" title="Réglages de Lia">⚙</button><button class="cl" title="Nouvelle conversation">🧹</button></div>
 <div class="cfg" hidden></div><div class="log"></div>
@@ -64,14 +67,15 @@ window.DGAssist={
       engine='web';setSt(c.ready?'ok':'wait',c.ready?'Prête · '+(MODELS[c.webModel]||c.webModel).split(' —')[0]+' (intégrée)':'Pas encore activée')}
     async function loadWeb(){if(web)return web;if(webLoading)return webLoading;const c=cfg();
       const wrap=document.createElement('div');wrap.className='help';wrap.innerHTML='<b>Je m\'installe…</b> <span class="pt"></span><div class="bar"><i></i></div>';log.append(wrap);log.scrollTop=log.scrollHeight;
-      webLoading=(async()=>{try{navigator.storage&&navigator.storage.persist&&await navigator.storage.persist()}catch(e){}const W=await import(WEBLLM);const e=await W.CreateMLCEngine(c.webModel,{initProgressCallback:r=>{wrap.querySelector('.pt').textContent=(()=>{const t=r.text||'',m=t.match(/(\d+)MB fetched\. (\d+)% completed/);if(m)return 'Téléchargement : '+m[1]+' Mo ('+m[2]+' %)';const k=t.match(/\[(\d+)\/(\d+)\]/);if(/cache/i.test(t)&&k)return 'Chargement '+Math.round(k[1]/k[2]*100)+' %';if(/shader|GPU/i.test(t))return 'Préparation de la carte graphique…';return t.slice(0,60)})();wrap.querySelector('i').style.width=Math.round((r.progress||0)*100)+'%'}});
+      webLoading=(async()=>{try{navigator.storage&&navigator.storage.persist&&await navigator.storage.persist()}catch(e){}let mid=c.webModel;try{const ad=await navigator.gpu.requestAdapter();if(!ad)throw new Error('aucune carte graphique compatible');if(!ad.features.has('shader-f16'))mid=mid.replace('q4f16_1','q4f32_1')}catch(e){if(/aucune/.test(e.message))throw e}
+        const W=await import(WEBLLM);const e=await W.CreateMLCEngine(mid,{initProgressCallback:r=>{wrap.querySelector('.pt').textContent=(()=>{const t=r.text||'',m=t.match(/(\d+)MB fetched\. (\d+)% completed/);if(m)return 'Téléchargement : '+m[1]+' Mo ('+m[2]+' %)';const k=t.match(/\[(\d+)\/(\d+)\]/);if(/cache/i.test(t)&&k)return 'Chargement '+Math.round(k[1]/k[2]*100)+' %';if(/shader|GPU/i.test(t))return 'Préparation de la carte graphique…';return t.slice(0,60)})();wrap.querySelector('i').style.width=Math.round((r.progress||0)*100)+'%'}});
         web=e;saveCfg({ready:true});wrap.remove();setSt('ok','Prête · '+(MODELS[c.webModel]||c.webModel).split(' —')[0]+' (intégrée)');return e})();
       try{return await webLoading}catch(err){webLoading=null;wrap.remove();if(/quota/i.test(err.message))throw new Error('pas assez d\'espace disque libre (il faut environ '+(((MODELS[c.webModel]||'').split('≈ ')[1]||'').split(' ·')[0]||'quelques Go')+' de libre).');throw err}}
     // ---- écran d'accueil ----
     const SUG=app=='3d'?['Ajoute 8 montants 2x4 aux 16 po','Fais une plaque d\'acier 200 par 100 par 6 avec 4 trous de 10','Combien de planches dois-je acheter ?','Comment je verrouille une pièce ?']
       :['Dessine une pièce de 4 m par 3,5 m','Ajoute une chambre de 12 pi par 10 pi','Combien ça va coûter en matériaux ?','Comment je change une cote ?'];
     function welcome(){log.innerHTML='';const c=cfg(),d=document.createElement('div');d.className='m a';
-      d.textContent='Bonjour, je suis Lia, votre assistante. Demandez-moi de dessiner, de calculer ou de vous expliquer quelque chose. Je fonctionne sur votre ordinateur : rien ne part sur internet.';
+      d.textContent='Bonjour, je suis Lia ! Que voulez-vous faire ? Dites-le-moi : je peux le faire pour vous, ou vous montrer comment le faire. Je fonctionne sur votre ordinateur, sans internet.';
       const s=document.createElement('div');s.className='sugg';SUG.forEach(x=>{const b=document.createElement('button');b.textContent=x;b.onclick=()=>{ta.value=x;send()};s.append(b)});
       if(engine=='web'&&!c.ready){const h=document.createElement('div');h.className='help';
         h.innerHTML='<b>Activer Lia sur cet ordinateur</b><br>Je dois me télécharger <b>une seule fois</b> (<span class="sz"></span>). Ensuite je fonctionne <b>sans internet</b>, gratuitement.<button class="big">👩 Activer Lia</button>';

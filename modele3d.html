@@ -13,6 +13,7 @@
 html,body{height:100%;background:var(--bg);color:var(--txt);font:13px system-ui,sans-serif;overflow:hidden}
 #top{height:46px;display:flex;align-items:center;gap:5px;padding:0 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto}
 #top b{margin-right:6px;white-space:nowrap;font-size:14px}
+#top .lia{background:linear-gradient(135deg,#ff6fbf,#7b4dff);border:0;color:#fff;font-weight:700;padding:6px 12px;border-radius:18px}#top .dgmb{font-weight:600}
 button,select,input,textarea{font:inherit;color:var(--txt)}
 button{background:#2f333c;border:1px solid var(--line);border-radius:7px;padding:5px 9px;cursor:pointer;white-space:nowrap}
 button.on{background:var(--acc);border-color:var(--acc)}
@@ -43,21 +44,19 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v11</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v12</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a>
-  <span class="sep"></span>
-  <button data-add="extrude">⬆ Extrusion</button>
-  <button data-add="revolve">🔄 Révolution</button>
-  <button data-add="hole">🕳 Trou</button>
-  <button data-add="cut">✂ Enlèvement</button>
+  <span id="tbCreate"></span><button id="fExt" data-add="extrude">⬆ Extrusion</button>
+  <button id="fRev" data-add="revolve">🔄 Révolution</button>
+  <button id="fHole" data-add="hole">🕳 Trou</button>
+  <button id="fCut" data-add="cut">✂ Enlèvement</button>
   <span class="sep"></span>
   <button id="woodB">🪵 Bois</button><button id="consB">🔗 Contrainte</button><button id="cutlB">📋 Liste de coupe</button><button id="lockAll">🔓 Assemblage</button>
   <span class="sep"></span>
   <button id="houseB">🏠 Maison 3D depuis le plan</button>
-  <span class="sep"></span>
   <button id="undoB" title="Annuler (Ctrl+Z)">↶</button><button id="redoB" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
-  <button id="newB">Nouveau</button><button id="saveB">Enregistrer</button><button id="openB">Ouvrir</button><button id="impB">📥 Importer STEP/IGES/STL/OBJ</button><button id="stlB">Export STL</button><button id="objB">Export OBJ</button><button id="pngB">PNG</button>
-  <button id="aiB" title="Lia, votre assistante IA (intégrée, sans internet)">👩 Lia</button><button id="winB" title="Afficher / masquer / réorganiser les fenêtres">🪟 Fenêtres</button><button id="treeT">Arbre</button><button id="propT">Param.</button>
+  <span id="tbEnd"></span><button id="newB">📄 Nouveau</button><button id="saveB">💾 Enregistrer</button><button id="openB">📂 Ouvrir</button><button id="impB">📥 Importer STEP / IGES / STL / OBJ</button><button id="stlB">⬇ Exporter STL (impression 3D)</button><button id="objB">⬇ Exporter OBJ</button><button id="pngB">🖼 Exporter une image PNG</button>
+  <button id="winB">🪟 Fenêtres…</button><button id="treeT">◧ Panneau de gauche</button><button id="propT">◨ Panneau de droite</button>
   <input type="file" id="file" accept=".drawgene,.json" hidden><input type="file" id="impF" accept=".step,.stp,.iges,.igs,.stl,.obj,.brep" multiple hidden>
 </div>
 <div id="main">
@@ -673,9 +672,14 @@ function example(){M={feats:[],nid:1};const A=(f)=>{f.id=M.nid++;M.feats.push(f)
   A({type:'revolve',name:'Moyeu',plane:'XY',pts:'15,12; 28,12; 28,45; 22,50; 15,50',angle:360,x:0,y:0,z:0,mat:'acier',qty:1,on:true})}
 try{const o=JSON.parse(localStorage.getItem('planpro3d')||'null');if(o&&o.feats&&o.feats.length)M=o;else example()}catch(e){example()}
 const libBox=DGLib.mount(document.body,'3d',R.domElement,insert3D,{embedded:true});
-const aiBox=DGAssist.mount('3d',AITOOLS,modelSummary);
-const WM=DGPanels.init('3d',$('main'),view,[{id:'tree',title:'Arbre du modèle',el:$('tree'),dock:'left',w:230},{id:'props',title:'Paramètres',el:$('props'),dock:'right',w:290,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:290,weight:1},{id:'ai',title:'👩 Lia — assistante',el:aiBox,dock:'left',w:300,weight:1.2}]);
-$('winB').onclick=()=>WM.menu($('winB'));$('aiB').onclick=()=>{const p=WM.panels.ai;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('treeT').onclick=()=>WM.toggleDock('left');$('propT').onclick=()=>WM.toggleDock('right');
+const aiBox=DGAssist.mount('3d',AITOOLS,modelSummary,{'Menu Créer (Extrusion, Révolution, Trou, Enlèvement)':'.dgmb','Bois':'#woodB','Contrainte':'#consB','Liste de coupe':'#cutlB',
+  'Annuler':'#undoB','Rétablir':'#redoB','Supprimer':'#delSel','Menu Fichier (Nouveau, Ouvrir, Enregistrer, importer, exporter)':'.dgmb','Retour au plan 2D':'a[href="plan.html"] button',
+  'Vues (Iso, Face, Dessus)':'#vbtn','Mesurer':'#measB','Sélection par zone':'#boxB','Déplacer / Tourner':'#tmB','Vue en coupe':'#secB','Arbre du modèle':'#tree','Paramètres':'#props','Bibliothèque':'.dglib'});
+const WM=DGPanels.init('3d',$('main'),view,[{id:'tree',title:'Arbre du modèle',el:$('tree'),dock:'left',w:230},{id:'props',title:'Paramètres',el:$('props'),dock:'right',w:290,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:290,weight:1},{id:'lia',title:'👩 Lia — votre assistante',el:aiBox,dock:'float',x:Math.max(80,innerWidth-310-360),y:Math.max(60,innerHeight-Math.min(470,innerHeight-110)-12),w:350,h:Math.min(470,innerHeight-110)}]);
+DGMenu.group('✏ Créer ▾','Extrusion, révolution, trou, enlèvement',['fExt','fRev','fHole','fCut'],$('tbCreate'));
+DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, importer, exporter',['newB','openB','saveB','-','impB','stlB','objB','pngB'],$('tbEnd'));
+const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['houseB','lockAll','winB','treeT','propT'],$('tbEnd'));
+$('winB').onclick=()=>WM.menu(plusB);$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('treeT').onclick=()=>WM.toggleDock('left');$('propT').onclick=()=>WM.toggleDock('right');
 resize();rebuild();fitView();
 </script>
 </body>
