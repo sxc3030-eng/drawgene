@@ -43,7 +43,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v10</small></b>
+  <b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v11</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a>
   <span class="sep"></span>
   <button data-add="extrude">⬆ Extrusion</button>
@@ -57,7 +57,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
   <span class="sep"></span>
   <button id="undoB" title="Annuler (Ctrl+Z)">↶</button><button id="redoB" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
   <button id="newB">Nouveau</button><button id="saveB">Enregistrer</button><button id="openB">Ouvrir</button><button id="impB">📥 Importer STEP/IGES/STL/OBJ</button><button id="stlB">Export STL</button><button id="objB">Export OBJ</button><button id="pngB">PNG</button>
-  <button id="aiB" title="Assistant IA local (Mistral)">🤖 Assistant</button><button id="winB" title="Afficher / masquer / réorganiser les fenêtres">🪟 Fenêtres</button><button id="treeT">Arbre</button><button id="propT">Param.</button>
+  <button id="aiB" title="Lia, votre assistante IA (intégrée, sans internet)">👩 Lia</button><button id="winB" title="Afficher / masquer / réorganiser les fenêtres">🪟 Fenêtres</button><button id="treeT">Arbre</button><button id="propT">Param.</button>
   <input type="file" id="file" accept=".drawgene,.json" hidden><input type="file" id="impF" accept=".step,.stp,.iges,.igs,.stl,.obj,.brep" multiple hidden>
 </div>
 <div id="main">
@@ -674,7 +674,7 @@ function example(){M={feats:[],nid:1};const A=(f)=>{f.id=M.nid++;M.feats.push(f)
 try{const o=JSON.parse(localStorage.getItem('planpro3d')||'null');if(o&&o.feats&&o.feats.length)M=o;else example()}catch(e){example()}
 const libBox=DGLib.mount(document.body,'3d',R.domElement,insert3D,{embedded:true});
 const aiBox=DGAssist.mount('3d',AITOOLS,modelSummary);
-const WM=DGPanels.init('3d',$('main'),view,[{id:'tree',title:'Arbre du modèle',el:$('tree'),dock:'left',w:230},{id:'props',title:'Paramètres',el:$('props'),dock:'right',w:290,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:290,weight:1},{id:'ai',title:'🤖 Assistant',el:aiBox,dock:'left',w:300,weight:1.2}]);
+const WM=DGPanels.init('3d',$('main'),view,[{id:'tree',title:'Arbre du modèle',el:$('tree'),dock:'left',w:230},{id:'props',title:'Paramètres',el:$('props'),dock:'right',w:290,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:290,weight:1},{id:'ai',title:'👩 Lia — assistante',el:aiBox,dock:'left',w:300,weight:1.2}]);
 $('winB').onclick=()=>WM.menu($('winB'));$('aiB').onclick=()=>{const p=WM.panels.ai;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('treeT').onclick=()=>WM.toggleDock('left');$('propT').onclick=()=>WM.toggleDock('right');
 resize();rebuild();fitView();
 </script>
