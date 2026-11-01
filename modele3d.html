@@ -43,7 +43,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v7</small></b>
+  <b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v8</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a>
   <span class="sep"></span>
   <button data-add="extrude">⬆ Extrusion</button>
@@ -55,7 +55,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
   <span class="sep"></span>
   <button id="houseB">🏠 Maison 3D depuis le plan</button>
   <span class="sep"></span>
-  <button id="undoB">↶</button><button id="redoB">↷</button>
+  <button id="undoB" title="Annuler (Ctrl+Z)">↶</button><button id="redoB" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
   <button id="newB">Nouveau</button><button id="saveB">Enregistrer</button><button id="openB">Ouvrir</button><button id="impB">📥 Importer STEP/IGES/STL/OBJ</button><button id="stlB">Export STL</button><button id="objB">Export OBJ</button><button id="pngB">PNG</button>
   <button id="winB" title="Afficher / masquer / réorganiser les fenêtres">🪟 Fenêtres</button><button id="treeT">Arbre</button><button id="propT">Param.</button>
   <input type="file" id="file" accept=".drawgene,.json" hidden><input type="file" id="impF" accept=".step,.stp,.iges,.igs,.stl,.obj,.brep" multiple hidden>
@@ -73,6 +73,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
 <script src="lib.js"></script>
 <script src="panels.js"></script>
+<script src="cmenu.js"></script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
@@ -329,7 +330,7 @@ function renderProps(){const P=$('props'),f=fid(sel),c=selComp();
   P.querySelectorAll('[data-i]').forEach(el=>el.onchange=()=>{const x=F[el.dataset.i];let v=el.value;
     if(x.kind=='num'){v=parseFloat(v.replace(',','.'));if(!isFinite(v)){renderProps();return}if(['w','h','d','depth','qty','n'].includes(x.k)&&v<=0){renderProps();return}}
     if(x.kind=='bool')v=v=='1';if(x.k=='parent')v=+v;snap();f[x.k]=v;rebuild()});
-  $('delB').onclick=()=>{snap();M.feats=M.feats.filter(x=>x.id!=f.id&&x.parent!=f.id);sel=null;rebuild()};
+  $('delB').onclick=()=>deleteFeat(f);
   $('dupB').onclick=()=>{snap();const c=JSON.parse(JSON.stringify(f));c.id=M.nid++;c.name+=' (copie)';if(c.type=='extrude'||c.type=='revolve')c.x+=20;M.feats.push(c);
     if(f.type=='extrude')M.feats.filter(x=>x.parent==f.id&&x.id!=c.id).forEach(x=>{const y=JSON.parse(JSON.stringify(x));y.id=M.nid++;y.parent=c.id;M.feats.push(y)});sel=c.id;rebuild()};
   const mv=d=>{const i=M.feats.indexOf(f),j=i+d;if(j<0||j>=M.feats.length)return;snap();[M.feats[i],M.feats[j]]=[M.feats[j],M.feats[i]];rebuild()};$('upB').onclick=()=>mv(-1);$('dnB').onclick=()=>mv(1)}
@@ -343,7 +344,8 @@ tc.addEventListener('mouseDown',()=>snap());
 tc.addEventListener('objectChange',()=>{const o=tc.object,c=o&&compOf(o.userData.comp);if(!c)return;const r=v=>Math.round(v*100)/100;
   c.x=r(o.position.x);c.y=r(o.position.y);c.z=r(o.position.z);c.rx=r(o.rotation.x/D2R);c.ry=r(o.rotation.y/D2R);c.rz=r(o.rotation.z/D2R);$('info').textContent=`🧩 ${c.name}   X ${c.x}  Y ${c.y}  Z ${c.z}   Rot ${c.rx}° ${c.ry}° ${c.rz}°`});
 tc.addEventListener('mouseUp',()=>{down=null;setTimeout(rebuild,0)});
-R.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};if(tc.dragging||tc.axis||measuring||consPick)return;const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);
+let rdown=null;R.domElement.addEventListener('contextmenu',e=>{e.preventDefault();if(rdown&&Math.hypot(e.clientX-rdown.x,e.clientY-rdown.y)<6)ctx3(e);rdown=null});
+R.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,b:e.button};if(e.button==2)rdown={x:e.clientX,y:e.clientY};if(e.button!==0)return;if(tc.dragging||tc.axis||measuring||consPick)return;const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);
   // 1) poignées d'étirement
   if(handles){const h=ray.intersectObjects(handles.children);if(h.length){const H=h[0].object.userData.h,f=fid(H.f);if(!f)return;ctl.enabled=false;snap();
     const m=h[0].object.matrixWorld,org=new THREE.Vector3().setFromMatrixPosition(m),dir=new THREE.Vector3(0,1,0).transformDirection(m).normalize();
@@ -368,7 +370,7 @@ R.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};i
     const g=[];group.traverse(o=>{if(o.userData&&o.userData.comp==RC.id&&o.isGroup)g.push(o)});if(g[0]){g[0].position.set(RC.x,RC.y,RC.z)}$('info').textContent=`🧩 ${RC.name}  X ${RC.x}  Y ${RC.y}  Z ${RC.z} mm`};
   const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);ctl.enabled=true;if(moved){down=null;rebuild()}else undoS.pop()};
   addEventListener('pointermove',mv);addEventListener('pointerup',up)});
-R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down.x,e.clientY-down.y)>4)return;const r=R.domElement.getBoundingClientRect();
+R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down.x,e.clientY-down.y)>4)return;if(e.button==2||down.b==2){down=null;return}const r=R.domElement.getBoundingClientRect();
   ray.setFromCamera(ndc(e,r),cam);const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh);
   if(measuring){if(!h.length)return;measurePick(h[0]);return}
   if(consPick){if(!h.length||!h[0].object.userData.comp||!h[0].face){$('info').textContent='🔗 Cliquez sur une face d\'une pièce de l\'assemblage (Échap pour annuler)';return}consFace(h[0]);return}
@@ -385,9 +387,36 @@ function consFace(hit){const o=hit.object,c=compOf(o.userData.comp),Wi=worldMat(
   if(rootOf(compOf(rec.comp))===rootOf(compOf(consA.comp))){$('info').textContent='🔗 Choisissez une face sur une AUTRE pièce';return}
   snap();const k={id:M.nid++,type:'mate',off:0,a:consA,b:rec};cons().push(k);consPick=0;consA=null;$('consB').classList.remove('on');sel='k'+k.id;rebuild()}
 $('consB').onclick=()=>{if(consPick){consPick=0;$('consB').classList.remove('on');rebuild()}else startCons()};
+// ---------- Suppression et menu clic droit ----------
+function deleteFeat(f){if(!f)return;const c=f.comp&&compOf(f.comp)||(fid(f.parent)&&fid(f.parent).comp&&compOf(fid(f.parent).comp));if(c&&isLocked(c)){alert('Cette pièce est verrouillée. Déverrouillez-la d\'abord.');return}
+  snap();M.feats=M.feats.filter(x=>x.id!=f.id&&x.parent!=f.id);if(c&&!bodies().some(b=>b.comp==c.id)&&!kids(c).length){M.comps=comps().filter(x=>x!==c);M.cons=cons().filter(k=>k.a.comp!=c.id&&k.b.comp!=c.id)}sel=null;rebuild();$('info').textContent='🗑 Supprimé — Ctrl+Z pour annuler'}
+function deleteSelection(){if(selSet.length){deleteComps(selSet);return}const c=selComp();if(c){deleteComps([c.id]);return}const k=selCon();if(k){snap();M.cons=cons().filter(x=>x!==k);sel=null;rebuild();return}const f=fid(sel);if(f)deleteFeat(f)}
+function ctx3(e){const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh&&x.object.userData.id);
+  const o=h.length?h[0].object:null,f=o?fid(o.userData.id):null,C=o&&o.userData.comp?compOf(o.userData.comp):null,RT=C?rootOf(C):null,items=[];
+  const hasClip=!!(clip||(()=>{try{return localStorage.getItem('drawgene-clip')}catch(x){}})());
+  if(selSet.length>1&&C&&selSet.includes(RT.id)){items.push({head:selSet.length+' composants'},{icon:'🗑',label:'Supprimer la sélection',key:'Suppr',danger:true,action:()=>deleteComps(selSet)},{icon:'🧩',label:'Fusionner en sous-assemblage',action:()=>{sel='multi';rebuild();$('mF')&&$('mF').click()}},{icon:'📋',label:'Copier',key:'Ctrl+C',action:()=>copySel(selSet)},'-')}
+  else if(C){const lk=isLocked(C);items.push({head:C.name+(lk?' 🔒':'')},
+      {icon:'🗑',label:'Supprimer « '+C.name+' »',key:'Suppr',danger:true,disabled:lk,action:()=>deleteComps([C.id])});
+    if(RT!==C)items.push({icon:'🗑',label:'Supprimer tout « '+RT.name+' »',danger:true,disabled:isLocked(RT),action:()=>deleteComps([RT.id])});
+    items.push({icon:'📋',label:'Copier',key:'Ctrl+C',action:()=>{copySel([C.id],true);$('info').textContent='📋 Copié'}},
+      {icon:'⧉',label:'Dupliquer',key:'Ctrl+D',disabled:lk,action:()=>{copySel([C.id],true);pasteClip()}},
+      {icon:'✏',label:'Modifier les cotes',action:()=>{sel=f.id;selSet=[];rebuild()}},
+      {icon:'✥',label:'Sélectionner'+(RT!==C?' cette pièce seule':''),action:()=>{sel='c'+C.id;selSet=[];rebuild()}},
+      {icon:'↻',label:'Tourner 90°',key:'Alt+→',disabled:lk,action:()=>{snap();RT.ry=((RT.ry||0)+90)%360;rebuild()}},
+      {icon:'⤓',label:'Poser au sol',disabled:lk,action:()=>{snap();groundComp(RT);rebuild()}},
+      {icon:'🔗',label:'Contrainte depuis cette face',disabled:lk||!h[0].face,action:()=>{startCons();consFace(h[0])}},
+      {icon:C.locked?'🔓':'🔒',label:C.locked?'Déverrouiller':'Verrouiller',disabled:M.locked,action:()=>{snap();C.locked=!C.locked;rebuild()}},'-')}
+  else if(f){items.push({head:f.name},{icon:'🗑',label:'Supprimer',key:'Suppr',danger:true,action:()=>deleteFeat(f)},{icon:'✏',label:'Modifier les cotes',action:()=>{sel=f.id;selSet=[];rebuild()}},
+      {icon:'🧩',label:'Faire un composant',action:()=>{snap();const c={id:M.nid++,name:f.name,x:0,y:0,z:0,rx:0,ry:0,rz:0};comps().push(c);f.comp=c.id;sel='c'+c.id;rebuild()}},'-')}
+  items.push({icon:'📋',label:'Coller',key:'Ctrl+V',disabled:!hasClip,action:()=>pasteClip()},{icon:'↶',label:'Annuler',key:'Ctrl+Z',disabled:!undoS.length,action:()=>$('undoB').click()},{icon:'↷',label:'Rétablir',key:'Ctrl+Y',disabled:!redoS.length,action:()=>$('redoB').click()},'-',
+    {icon:'▦',label:'Tout sélectionner',key:'Ctrl+A',disabled:!comps().length,action:()=>{selSet=comps().filter(c=>c.parent==null||!compOf(c.parent)).map(c=>c.id);sel=selSet.length==1?'c'+selSet[0]:'multi';if(selSet.length==1)selSet=[];rebuild()}},
+    {icon:'🪵',label:'Ajouter du bois',action:()=>$('woodB').click()},{icon:'📏',label:'Mesurer',action:()=>$('measB').click()},{icon:'⛶',label:'Ajuster la vue',action:fitView});
+  DGMenu.show(e.clientX,e.clientY,items)}
+$('delSel').onclick=deleteSelection;
+
 // ---------- Copier / coller (répète l'espacement) ----------
 let clip=null,lastPaste=null;
-function copySel(ids){const roots=[...new Set(ids.map(i=>rootOf(compOf(i))).filter(Boolean))];if(!roots.length)return false;const all=new Set();roots.forEach(c=>descIds(c).forEach(i=>all.add(i)));
+function copySel(ids,exact){const roots=[...new Set(ids.map(i=>exact?compOf(i):rootOf(compOf(i))).filter(Boolean))];if(!roots.length)return false;const all=new Set();roots.forEach(c=>descIds(c).forEach(i=>all.add(i)));
   const fs=M.feats.filter(f=>all.has(f.comp)),fids=new Set(fs.map(f=>f.id));
   clip={roots:roots.map(c=>c.id),comps:JSON.parse(JSON.stringify(comps().filter(c=>all.has(c.id)))),feats:JSON.parse(JSON.stringify(M.feats.filter(f=>fids.has(f.id)||fids.has(f.parent)),(k,v)=>k[0]=='_'?undefined:v)),cons:JSON.parse(JSON.stringify(cons().filter(k=>all.has(k.a.comp)&&all.has(k.b.comp))))};
   clip.comps.forEach(c=>{if(clip.roots.includes(c.id))delete c.parent;delete c.locked});lastPaste=null;try{localStorage.setItem('drawgene-clip',JSON.stringify(clip))}catch(e){}return true}
@@ -489,7 +518,9 @@ addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)
   if(ctrl&&K.toLowerCase()=='c'&&ids.length){e.preventDefault();if(copySel(ids))$('info').textContent='📋 Copié ('+ids.length+') — Ctrl+V pour coller';return}
   if(ctrl&&K.toLowerCase()=='v'){e.preventDefault();pasteClip();return}
   if(ctrl&&K.toLowerCase()=='d'&&ids.length){e.preventDefault();copySel(ids);pasteClip();return}
-  if(K=='Delete'||K=='Backspace'){if(ids.length){deleteComps(ids);return}if(selCon()){snap();M.cons=cons().filter(x=>x!==selCon());sel=null;rebuild();return}if(fid(sel))$('delB')&&$('delB').click();return}
+  if(K=='Delete'||K=='Backspace'){e.preventDefault();deleteSelection();return}
+  if(ctrl&&K.toLowerCase()=='a'){e.preventDefault();selSet=comps().filter(c=>c.parent==null||!compOf(c.parent)).map(c=>c.id);sel=selSet.length==1?'c'+selSet[0]:(selSet.length?'multi':null);if(selSet.length==1)selSet=[];rebuild();return}
+  if(ctrl&&K.toLowerCase()=='x'&&ids.length){e.preventDefault();if(copySel(ids))deleteComps(ids);return}
   if(K.toLowerCase()=='g'&&!ctrl){setTM('translate');return}if(K.toLowerCase()=='r'&&!ctrl){setTM('rotate');return}
   const mv={ArrowLeft:[-1,0,0],ArrowRight:[1,0,0],ArrowUp:[0,0,-1],ArrowDown:[0,0,1],PageUp:[0,1,0],PageDown:[0,-1,0]}[K];
   if(mv&&ids.length){e.preventDefault();const roots=[...new Set(ids.map(i=>rootOf(compOf(i))))];if(roots.some(isLocked)){$('info').textContent='🔒 Pièce verrouillée';return}
