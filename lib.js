@@ -27,6 +27,7 @@ const DGLib={
 .dgit:hover{border-color:#3d8bff}.dgit img{width:100%;aspect-ratio:4/3;object-fit:contain;display:block;background:#15171c;border-radius:4px;pointer-events:none}
 .dgit span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;pointer-events:none}
 .dgit .x{position:absolute;top:1px;right:1px;padding:0 4px;font-size:10px;display:none;background:#5a2020;border:0;color:#fff;border-radius:4px;cursor:pointer}.dgit:hover .x{display:block}
+.dgit .bd{position:absolute;top:2px;left:2px;background:#ffb020;color:#000;font-size:9px;padding:0 3px;border-radius:3px;z-index:1}
 .dgempty{padding:10px;color:#9aa0ab;line-height:1.4}
 .dgghost{position:fixed;z-index:99;pointer-events:none;width:90px;opacity:.85;border:2px solid #3dff8b;border-radius:8px;background:#15171c;transform:translate(-50%,-50%)}`;
     if(!document.getElementById('dglibcss')){const s=document.createElement('style');s.id='dglibcss';s.textContent=css;document.head.append(s)}
@@ -45,7 +46,7 @@ const DGLib={
       box.querySelector('.cnt').textContent=items.length?'('+items.length+')':'';
       grid.innerHTML=items.length?'':`<div class="dgempty" style="grid-column:1/-1">Vide. Cliquez <b>Enregistrer</b> : la pièce apparaît ici.<br>Ensuite, glissez-la dans le dessin pour l'assembler.</div>`;
       items.forEach(it=>{const d=document.createElement('div');d.className='dgit';d.title=it.name+'\nGlisser dans le dessin pour l\'ajouter';
-        d.innerHTML=`<img alt=""><span></span><button class="x" title="Retirer de la bibliothèque">✕</button>`;d.querySelector('span').textContent=it.name;if(/^data:image\//.test(it.thumb||''))d.querySelector('img').src=it.thumb;
+        d.innerHTML=`${it.sub=='asm'?'<b class="bd">ASM</b>':''}<img alt=""><span></span><button class="x" title="Retirer de la bibliothèque">✕</button>`;d.querySelector('span').textContent=it.name;if(/^data:image\//.test(it.thumb||''))d.querySelector('img').src=it.thumb;
         d.querySelector('.x').onpointerdown=e=>e.stopPropagation();
         d.querySelector('.x').onclick=e=>{e.stopPropagation();if(confirm('Retirer « '+it.name+' » de la bibliothèque ?'))DGLib.remove(it.id)};
         d.onpointerdown=e=>startDrag(e,it,d);grid.append(d)})}

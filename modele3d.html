@@ -29,6 +29,9 @@ select,input,textarea{background:#1b1d23;border:1px solid var(--line);border-rad
 #props{width:280px;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:10px}
 h4{font-size:11px;text-transform:uppercase;color:var(--mut);margin:10px 0 6px}
 .f{display:grid;grid-template-columns:1fr 1.2fr;gap:4px 8px;align-items:center;margin-bottom:5px}
+.bk{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.pill{display:inline-block;padding:1px 6px;border-radius:9px;background:#3d8bff33;color:#9ec5ff;font-size:10px;margin-left:4px}
+.lk{color:#ffb020}
 .note{color:var(--mut);font-size:11px;line-height:1.45;margin-top:6px}
 table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-bottom:1px solid var(--line)}td:last-child{text-align:right}
 @media(max-width:760px){#tree{position:absolute;left:0;top:46px;bottom:0;z-index:5;transform:translateX(-100%);transition:.2s;width:70%}#tree.open{transform:none}
@@ -45,6 +48,8 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
   <button data-add="hole">🕳 Trou</button>
   <button data-add="cut">✂ Enlèvement</button>
   <span class="sep"></span>
+  <button id="woodB">🪵 Bois</button><button id="consB">🔗 Contrainte</button><button id="cutlB">📋 Liste de coupe</button><button id="lockAll">🔓 Assemblage</button>
+  <span class="sep"></span>
   <button id="houseB">🏠 Maison 3D depuis le plan</button>
   <span class="sep"></span>
   <button id="undoB">↶</button><button id="redoB">↷</button>
@@ -55,13 +60,14 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 <div id="main">
   <div id="tree"></div>
   <div id="view">
-    <div id="vbtn"><button data-v="iso">Iso</button><button data-v="front">Face</button><button data-v="top">Dessus</button><button data-v="right">Droite</button><button id="wireB">Filaire</button><button id="edgeB" class="on">Arêtes</button><button id="fitB">Ajuster</button><button id="measB">📏 Mesurer</button><button id="clrM">Effacer mesures</button></div><div id="labels" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>
+    <div id="vbtn"><button data-v="iso">Iso</button><button data-v="front">Face</button><button data-v="top">Dessus</button><button data-v="right">Droite</button><button id="wireB">Filaire</button><button id="edgeB" class="on">Arêtes</button><button id="fitB">Ajuster</button><button id="measB">📏 Mesurer</button><button id="clrM">Effacer mesures</button><button id="tmB" class="on" title="Flèches : déplacer (G) / tourner (R)">✥ Déplacer</button><button id="secB">✂ Vue en coupe</button><span id="secP" hidden style="display:none;align-items:center;gap:4px;background:#22252c;border:1px solid #363a44;border-radius:7px;padding:2px 6px"><select id="secA" style="width:auto"><option>X</option><option selected>Y</option><option>Z</option></select><input type="range" id="secR" min="0" max="1000" value="500" style="width:120px"><button id="secF" title="Inverser le côté">⇄</button></span></div><div id="labels" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>
     <div id="info"></div>
   </div>
   <div id="props"></div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
 <script src="lib.js"></script>
 <script>
 'use strict';
@@ -121,6 +127,8 @@ const R=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});R.s
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x1a1d23);
 const cam=new THREE.PerspectiveCamera(40,1,0.1,1e6);cam.position.set(200,160,220);
 const ctl=new THREE.OrbitControls(cam,R.domElement);ctl.enableDamping=true;
+const tc=new THREE.TransformControls(cam,R.domElement);tc.setSpace('world');tc.setSize(.9);tc.setRotationSnap(15*Math.PI/180);
+tc.addEventListener('dragging-changed',e=>{ctl.enabled=!e.value});
 scene.add(new THREE.HemisphereLight(0xffffff,0x445566,.75));const dl=new THREE.DirectionalLight(0xffffff,.7);dl.position.set(1,2,1.5);scene.add(dl);const dl2=new THREE.DirectionalLight(0xffffff,.3);dl2.position.set(-1,-.5,-1);scene.add(dl2);
 let grid=new THREE.GridHelper(1000,50,0x3a4050,0x262a33);scene.add(grid);
 const axes=new THREE.AxesHelper(50);scene.add(axes);
@@ -130,51 +138,131 @@ function resize(){const r=view.getBoundingClientRect();R.setSize(r.width,r.heigh
 addEventListener('resize',resize);
 (function loop(){requestAnimationFrame(loop);ctl.update();try{placeLabels()}catch(e){}R.render(scene,cam)})();
 
-const comps=()=>M.comps||(M.comps=[]);const compOf=id=>comps().find(c=>c.id==id);const selComp=()=>typeof sel=='string'&&sel[0]=='c'?compOf(+sel.slice(1)):null;
+const comps=()=>M.comps||(M.comps=[]);const cons=()=>M.cons||(M.cons=[]);const compOf=id=>comps().find(c=>c.id==id);
+const selComp=()=>typeof sel=='string'&&sel[0]=='c'?compOf(+sel.slice(1)):null;
+const selCon=()=>typeof sel=='string'&&sel[0]=='k'?cons().find(k=>k.id==+sel.slice(1)):null;
+let selSet=[];// sélection multiple (Ctrl+clic) : ids de composants racines
 const D2R=Math.PI/180;
-function rebuild(){group.clear();let tot={kg:0,vol:0,n:0};const info=[];const CG={};
-  comps().forEach(c=>{const g=new THREE.Group();g.position.set(c.x||0,c.y||0,c.z||0);g.rotation.set((c.rx||0)*D2R,(c.ry||0)*D2R,(c.rz||0)*D2R);g.userData.comp=c.id;CG[c.id]=g;group.add(g)});
-  const sc=selComp();
+const rootOf=c=>{while(c&&c.parent!=null&&compOf(c.parent))c=compOf(c.parent);return c};
+const kids=c=>comps().filter(x=>x.parent==c.id);
+const descIds=c=>{const out=[c.id];kids(c).forEach(k=>out.push(...descIds(k)));return out};
+const isLocked=c=>{if(M.locked)return true;while(c){if(c.locked)return true;c=c.parent!=null?compOf(c.parent):null}return false};
+function localMat(c){return new THREE.Matrix4().compose(new THREE.Vector3(c.x||0,c.y||0,c.z||0),new THREE.Quaternion().setFromEuler(new THREE.Euler((c.rx||0)*D2R,(c.ry||0)*D2R,(c.rz||0)*D2R)),new THREE.Vector3(1,1,1))}
+function worldMat(c){const m=localMat(c);return c.parent!=null&&compOf(c.parent)?worldMat(compOf(c.parent)).multiply(m):m}
+function setWorld(c,W){const L=c.parent!=null&&compOf(c.parent)?worldMat(compOf(c.parent)).invert().multiply(W):W;const p=new THREE.Vector3(),q=new THREE.Quaternion(),s=new THREE.Vector3();L.decompose(p,q,s);
+  const e=new THREE.Euler().setFromQuaternion(q,'XYZ'),r=v=>Math.round(v*100)/100;c.x=r(p.x);c.y=r(p.y);c.z=r(p.z);c.rx=r(e.x/D2R);c.ry=r(e.y/D2R);c.rz=r(e.z/D2R)}
+// ---- contraintes (face contre face / alignées), comme Pro/E ----
+function solveCons(){for(let it=0;it<4;it++)cons().forEach(k=>{if(k.off===undefined)k.off=0;let A=compOf(k.a.comp),B=compOf(k.b.comp);if(!A||!B)return;let a=k.a,b=k.b;
+    let RA=rootOf(A);if(isLocked(A)||RA===rootOf(B)){if(isLocked(B))return;[A,B]=[B,A];[a,b]=[b,a];RA=rootOf(A);if(RA===rootOf(B))return}
+    const WA=worldMat(A),WB=worldMat(B),nA=new THREE.Vector3(...a.n).transformDirection(WA),pA=new THREE.Vector3(...a.p).applyMatrix4(WA),nB=new THREE.Vector3(...b.n).transformDirection(WB),pB=new THREE.Vector3(...b.p).applyMatrix4(WB);
+    const tgt=k.type=='align'?nB.clone():nB.clone().negate();if(k.flip)tgt.negate();
+    const q=new THREE.Quaternion().setFromUnitVectors(nA,tgt),W=worldMat(RA);
+    const T=new THREE.Matrix4().makeTranslation(pA.x,pA.y,pA.z).multiply(new THREE.Matrix4().makeRotationFromQuaternion(q)).multiply(new THREE.Matrix4().makeTranslation(-pA.x,-pA.y,-pA.z));
+    const d=pA.clone().sub(pB).dot(nB)-(+k.off||0);
+    const W2=new THREE.Matrix4().makeTranslation(-nB.x*d,-nB.y*d,-nB.z*d).multiply(T).multiply(W);setWorld(RA,W2)})}
+let handles=null,secOn=false,secPlane=new THREE.Plane(new THREE.Vector3(0,-1,0),0);R.localClippingEnabled=true;
+function rebuild(){solveCons();group.clear();if(handles){scene.remove(handles);handles=null}let tot={kg:0,vol:0,n:0};const info=[];const CG={};
+  comps().forEach(c=>{const g=new THREE.Group();g.position.set(c.x||0,c.y||0,c.z||0);g.rotation.set((c.rx||0)*D2R,(c.ry||0)*D2R,(c.rz||0)*D2R);g.userData.comp=c.id;CG[c.id]=g});
+  comps().forEach(c=>{(c.parent!=null&&CG[c.parent]?CG[c.parent]:group).add(CG[c.id])});
+  const sc=selComp(),hi=new Set();if(sc)descIds(sc).forEach(i=>hi.add(i));selSet.forEach(id=>{const c=compOf(id);if(c)descIds(c).forEach(i=>hi.add(i))});
   bodies().forEach(f=>{if(!f.on)return;const tgt=f.comp&&CG[f.comp]?CG[f.comp]:group;let g;try{g=buildGeom(f)}catch(e){g=null}if(!g){info.push(f.name+' : profil invalide');return}
-    const selF=fid(sel),isSel=sel==f.id||(selF&&selF.parent==f.id)||(sc&&f.comp==sc.id);
-    const mat=new THREE.MeshStandardMaterial({color:COLORS[f.mat]||0xaaaaaa,metalness:['bois','pvc','acrylique','beton'].includes(f.mat)?0:.55,roughness:.45,wireframe:wire,emissive:isSel?0x3d5fa0:0,transparent:f.mat=='acrylique',opacity:f.mat=='acrylique'?.6:1,side:THREE.DoubleSide});
+    const selF=fid(sel),isSel=sel==f.id||(selF&&selF.parent==f.id)||hi.has(f.comp);
+    const mat=new THREE.MeshStandardMaterial({color:COLORS[f.mat]||0xaaaaaa,metalness:['bois','pvc','acrylique','beton'].includes(f.mat)?0:.55,roughness:.45,wireframe:wire,emissive:isSel?0x3d5fa0:0,transparent:f.mat=='acrylique',opacity:f.mat=='acrylique'?.6:1,side:THREE.DoubleSide,clippingPlanes:secOn?[secPlane]:null});
     const m=new THREE.Mesh(g,mat);m.userData.id=f.id;m.userData.comp=f.comp||null;tgt.add(m);
-    if(edges&&!wire)tgt.add(new THREE.LineSegments(new THREE.EdgesGeometry(g,25),new THREE.LineBasicMaterial({color:isSel?0xffb020:0x111111})));
+    if(edges&&!wire)tgt.add(new THREE.LineSegments(new THREE.EdgesGeometry(g,25),new THREE.LineBasicMaterial({color:isSel?0xffb020:0x111111,clippingPlanes:secOn?[secPlane]:null})));
     const v=volume(g),kg=v*1e-9*DENS[f.mat]*(f.qty||1);f._v=v;f._a=area(g);f._kg=v*1e-9*DENS[f.mat];g.computeBoundingBox();f._bb=g.boundingBox;tot.kg+=kg;tot.vol+=v*(f.qty||1);tot.n+=f.qty||1});
   if(house)group.add(house);
   imports.forEach(im=>{group.add(im.mesh);if(edges&&!wire)group.add(im.edges);im.mesh.material.wireframe=wire;tot.kg+=im.kg;tot.vol+=im.vol;tot.n++});
-  $('info').textContent=`Corps: ${tot.n}   Volume: ${(tot.vol/1000).toFixed(1)} cm³   Masse: ${tot.kg.toFixed(3)} kg`+(info.length?'\n⚠ '+info.join('\n⚠ '):'');
+  group.updateMatrixWorld(true);
+  // flèches de déplacement / rotation sur le composant sélectionné
+  const rc=sc?rootOf(sc):null;if(rc&&!isLocked(rc)&&CG[sc.id]&&!measuring&&!consPick){tc.attach(CG[sc.id]);if(!tc.parent)scene.add(tc);tc.setTranslationSnap(M.step||1)}else{tc.detach();if(tc.parent)scene.remove(tc)}
+  // poignées d'étirement sur la fonction sélectionnée
+  const sf=fid(sel);if(sf&&sf.type=='extrude'&&sf.on&&(sf.profile=='rect'||sf.profile=='circle')&&!(sf.comp&&isLocked(compOf(sf.comp)))&&!measuring)buildHandles(sf,sf.comp&&CG[sf.comp]?CG[sf.comp]:group);
+  $('info').textContent=`Corps: ${tot.n}   Volume: ${(tot.vol/1000).toFixed(1)} cm³   Masse: ${tot.kg.toFixed(3)} kg`+(M.locked?'   🔒 Assemblage verrouillé':'')+(info.length?'\n⚠ '+info.join('\n⚠ '):'');
+  $('lockAll').textContent=(M.locked?'🔒':'🔓')+' Assemblage';$('lockAll').classList.toggle('on',!!M.locked);
   renderTree();renderProps();save()}
+const ZDIR={XY:[0,0,1],XZ:[0,1,0],YZ:[1,0,0]};
+function featFrame(f){const o=new THREE.Object3D();if(f.plane=='XZ')o.rotation.x=-Math.PI/2;else if(f.plane=='YZ')o.rotation.y=Math.PI/2;o.position.set(f.x||0,f.y||0,f.z||0);o.updateMatrix();return o.matrix}
+function buildHandles(f,parent){handles=new THREE.Group();handles.matrixAutoUpdate=false;handles.matrix.copy(parent.matrixWorld).multiply(featFrame(f));
+  const zc=f.sym?0:f.depth/2,isC=f.profile=='circle',hw=isC?f.d/2:f.w/2,hh=isC?f.d/2:f.h/2,cu=f.u||0,cv=f.v||0;
+  const sz=Math.max(4,Math.min(60,Math.max(hw*2,hh*2,f.depth)*.07));
+  const list=[['x',1,[cu+hw,cv,zc]],['x',-1,[cu-hw,cv,zc]],['z',1,[cu,cv,zc+f.depth/2]],['z',-1,[cu,cv,zc-f.depth/2]]];if(!isC)list.push(['y',1,[cu,cv+hh,zc]],['y',-1,[cu,cv-hh,zc]]);
+  const col={x:0xff5050,y:0x50ff70,z:0x5090ff};
+  list.forEach(([ax,sg,p])=>{const m=new THREE.Mesh(new THREE.ConeGeometry(sz*.45,sz*1.4,16),new THREE.MeshBasicMaterial({color:col[ax],depthTest:false}));m.renderOrder=20;
+    const dir=new THREE.Vector3(ax=='x'?sg:0,ax=='y'?sg:0,ax=='z'?sg:0);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);m.position.set(p[0],p[1],p[2]).addScaledVector(dir,sz*.9);
+    m.userData.h={ax,sg,f:f.id};handles.add(m)});
+  scene.add(handles);handles.updateMatrixWorld(true)}
 
 // ---------- Arbre du modèle ----------
 const ICON={extrude:'⬆',revolve:'🔄',hole:'🕳',cut:'✂'};
-function renderTree(){const T=$('tree');let h='<h4>Arbre du modèle</h4><div class="it" style="cursor:default">📦 PIECE.prt</div>';
+function renderTree(){const T=$('tree');let h='<h4>Arbre du modèle</h4><div class="it" style="cursor:default">📦 '+(comps().length?'ASSEMBLAGE.asm':'PIECE.prt')+(M.name?' — '+String(M.name).replace(/[&<>"]/g,''):'')+'</div>';
   ['XY','XZ','YZ'].forEach(p=>h+=`<div class="it sub" style="cursor:default;color:#9aa0ab">▱ Plan ${p}</div>`);
   const E=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const bl=(f,ind)=>{h+=`<div class="it sub ${f.id==sel?'sel':''} ${f.on?'':'off'}" data-id="${f.id}" style="margin-left:${ind}px">${ICON[f.type]} ${E(f.name)}</div>`;
     M.feats.filter(x=>x.parent==f.id).forEach(x=>h+=`<div class="it sub ${x.id==sel?'sel':''} ${x.on?'':'off'}" data-id="${x.id}" style="margin-left:${ind+18}px">${ICON[x.type]} ${E(x.name)}</div>`)};
   bodies().filter(f=>!f.comp).forEach(f=>bl(f,18));
-  if(comps().length)h+='<h4>Assemblage</h4>';
-  comps().forEach(c=>{h+=`<div class="it ${sel=='c'+c.id?'sel':''}" data-c="${c.id}">🧩 ${E(c.name)}</div>`;bodies().filter(f=>f.comp==c.id).forEach(f=>bl(f,30))});
+  if(comps().length)h+=`<h4>Assemblage ${M.locked?'<span class="lk">🔒</span>':''}</h4>`;
+  const cl=(c,ind)=>{const k=kids(c),on=sel=='c'+c.id||selSet.includes(c.id);
+    h+=`<div class="it ${on?'sel':''}" data-c="${c.id}" style="margin-left:${ind}px">${k.length?'📂':'🧩'} ${E(c.name)}${c.locked?' <span class="lk">🔒</span>':''}${cons().some(x=>x.a.comp==c.id||x.b.comp==c.id)?' 🔗':''}</div>`;
+    if(on||k.length){k.forEach(x=>cl(x,ind+14));if(on)bodies().filter(f=>f.comp==c.id).forEach(f=>bl(f,ind+14))}};
+  comps().filter(c=>c.parent==null||!compOf(c.parent)).forEach(c=>cl(c,0));
+  if(cons().length){h+='<h4>Contraintes</h4>';cons().forEach(k=>{const a=compOf(k.a.comp),b=compOf(k.b.comp);
+    h+=`<div class="it ${sel=='k'+k.id?'sel':''}" data-k="${k.id}">🔗 ${k.type=='align'?'Aligner':'Face contre face'} : ${E(a?a.name:'?')} → ${E(b?b.name:'?')}</div>`})}
   if(house)h+='<div class="it sub">🏠 Maison (depuis plan)</div>';
-  imports.forEach((im,i)=>h+=`<div class="it sub" title="Pièce importée">📥 ${im.name} <button data-rm="${i}" style="margin-left:auto;padding:0 6px">✕</button></div>`);
-  if(!M.feats.length&&!house)h+='<p class="note">Ajoutez une fonction avec les boutons du haut : Extrusion, Révolution, puis Trou / Enlèvement dans une extrusion.</p>';
-  T.innerHTML=h;T.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{imports.splice(+b.dataset.rm,1);rebuild()});T.querySelectorAll('[data-id]').forEach(e=>e.onclick=()=>{sel=+e.dataset.id;rebuild()});T.querySelectorAll('[data-c]').forEach(e=>e.onclick=()=>{sel='c'+e.dataset.c;rebuild()})}
+  imports.forEach((im,i)=>h+=`<div class="it sub" title="Pièce importée">📥 ${E(im.name)} <button data-rm="${i}" style="margin-left:auto;padding:0 6px">✕</button></div>`);
+  if(!M.feats.length&&!house)h+='<p class="note">Ajoutez une fonction (Extrusion, Révolution…), du 🪵 Bois, ou glissez une pièce de la 📚 bibliothèque.</p>';
+  T.innerHTML=h;T.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{imports.splice(+b.dataset.rm,1);rebuild()});
+  T.querySelectorAll('[data-id]').forEach(e=>e.onclick=()=>{sel=+e.dataset.id;selSet=[];rebuild()});
+  T.querySelectorAll('[data-k]').forEach(e=>e.onclick=()=>{sel='k'+e.dataset.k;selSet=[];rebuild()});
+  T.querySelectorAll('[data-c]').forEach(e=>e.onclick=ev=>{const id=+e.dataset.c;if(ev.ctrlKey||ev.metaKey||ev.shiftKey){toggleMulti(id)}else{sel='c'+id;selSet=[]}rebuild()})}
+function toggleMulti(id){const cur=selComp();if(cur&&!selSet.length)selSet=[cur.id];const i=selSet.indexOf(id);if(i>=0)selSet.splice(i,1);else selSet.push(id);sel=selSet.length==1?'c'+selSet[0]:(selSet.length?'multi':null);if(selSet.length==1)selSet=[]}
+function compProps(P,c){const lk=isLocked(c),fs=bodies().filter(b=>descIds(c).includes(b.comp)),kg=fs.reduce((s,b)=>s+(b._kg||0)*(b.qty||1),0),dis=lk?'disabled':'',k=kids(c);
+  P.innerHTML=`<h4>${k.length?'📂 Sous-assemblage':'🧩 Composant'} ${lk?'<span class="lk">🔒 verrouillé</span>':''}</h4><div class="f"><span>Nom</span><input id="cN" ${dis}></div>
+  ${[['X (mm)','x'],['Y (mm)','y'],['Z (mm)','z'],['Rotation X (°)','rx'],['Rotation Y (°)','ry'],['Rotation Z (°)','rz']].map(([l,kk])=>`<div class="f"><span>${l}</span><input data-k="${kk}" ${dis} value="${+(c[kk]||0).toFixed(2)}"></div>`).join('')}
+  <div class="bk"><button id="cL">${c.locked?'🔓 Déverrouiller':'🔒 Verrouiller'}</button></div>
+  ${lk?'<p class="note">Pièce verrouillée : impossible de la déplacer, la modifier ou la supprimer.</p>':`
+  <div class="bk"><button data-r="ry">↻ 90° Y</button><button data-r="rx">↻ 90° X</button><button data-r="rz">↻ 90° Z</button><button id="cG">⤓ Poser au sol</button></div>
+  <div class="f"><span>Pas des flèches (mm)</span><input id="cS" value="${M.step||1}"></div>
+  <p class="note">Flèches rouge/vert/bleu : glisser pour déplacer. Clavier : ← → (X), ↑ ↓ (Z), PgPréc/PgSuiv (Y), Maj = ×10. Ctrl+C / Ctrl+V : copier-coller (le 2e collage répète le même espacement).</p>
+  <h4>Réseau (copies en série)</h4><div class="f"><span>Nombre total</span><input id="aN" value="5"></div><div class="f"><span>Espacement (mm)</span><input id="aE" value="406"></div>
+  <div class="f"><span>Direction</span><select id="aD"><option>X</option><option>Z</option><option>Y</option></select></div><div class="bk"><button id="aGo">▦ Créer le réseau</button><span class="note" style="margin:0">406 mm = 16 po c/c</span></div>
+  <div class="bk"><button id="cD">Dupliquer</button><button id="cX">🗑 Supprimer</button>${k.length?'<button id="cU">Dissocier</button>':''}<button id="cK">🔗 Contrainte</button></div>`}
+  <p class="note">${fs.length} corps · ${kg.toFixed(3)} kg${c.stock?' · '+c.stock.type:''}</p>`;
+  $('cN').value=c.name;$('cN').onchange=()=>{snap();c.name=$('cN').value||c.name;rebuild()};
+  $('cL').onclick=()=>{snap();c.locked=!c.locked;rebuild()};if(lk)return;
+  P.querySelectorAll('[data-k]').forEach(i=>i.onchange=()=>{const v=parseFloat(i.value.replace(',','.'));if(isFinite(v)){snap();c[i.dataset.k]=v}rebuild()});
+  P.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{snap();c[b.dataset.r]=((c[b.dataset.r]||0)+90)%360;rebuild()});
+  $('cS').onchange=()=>{const v=parseFloat($('cS').value.replace(',','.'));if(v>0)M.step=v;rebuild()};
+  $('cG').onclick=()=>{snap();groundComp(c);rebuild()};
+  $('cX').onclick=()=>{deleteComps([c.id])};
+  $('cD').onclick=()=>{copySel([c.id]);pasteClip(true)};
+  $('cK').onclick=()=>startCons();
+  if(k.length)$('cU').onclick=()=>{snap();k.forEach(x=>{const W=worldMat(x);x.parent=c.parent;if(x.parent==null)delete x.parent;setWorld(x,W)});if(!bodies().some(b=>b.comp==c.id))M.comps=comps().filter(x=>x!==c);sel=null;rebuild()};
+  $('aGo').onclick=()=>{const n=Math.round(+$('aN').value),e=parseFloat($('aE').value.replace(',','.')),ax=$('aD').value.toLowerCase();if(!(n>1)||!isFinite(e))return;
+    snap();copySel([c.id]);for(let i=1;i<n;i++){const r=pasteClip(false,true);r.forEach(x=>{x[ax]=(c[ax]||0)+e*i})}rebuild();$('info').textContent=`▦ Réseau : ${n} × « ${c.name} » aux ${e} mm`}}
+function multiProps(P){const L=selSet.map(compOf).filter(Boolean);P.innerHTML=`<h4>${L.length} composants sélectionnés</h4><p class="note">${L.map(c=>c.name).join(', ')}</p>
+  <div class="bk"><button id="mF">🧩 Fusionner en sous-assemblage</button><button id="mL">🔒 Verrouiller</button><button id="mX">🗑 Supprimer</button></div>
+  <p class="note">Fusionner = les pièces bougent ensemble comme un seul bloc (ex. un mur de planches). On peut dissocier ensuite.</p>`;
+  $('mF').onclick=()=>{const roots=[...new Set(L.map(rootOf))];if(roots.length<2)return;snap();const n=prompt('Nom du sous-assemblage :','Sous-assemblage '+(comps().filter(c=>kids(c).length).length+1));if(!n)return;
+    const P2={id:M.nid++,name:n,x:Math.round(roots.reduce((s,c)=>s+(c.x||0),0)/roots.length),y:0,z:Math.round(roots.reduce((s,c)=>s+(c.z||0),0)/roots.length),rx:0,ry:0,rz:0};comps().push(P2);
+    roots.forEach(c=>{const W=worldMat(c);c.parent=P2.id;setWorld(c,W)});sel='c'+P2.id;selSet=[];rebuild()};
+  $('mL').onclick=()=>{snap();L.forEach(c=>c.locked=true);rebuild()};$('mX').onclick=()=>deleteComps(L.map(c=>c.id))}
+function conProps(P,k){const a=compOf(k.a.comp),b=compOf(k.b.comp);P.innerHTML=`<h4>🔗 Contrainte</h4><p class="note">« ${a?a.name:'?'} » suit « ${b?b.name:'?'} »</p>
+  <div class="f"><span>Type</span><select id="kT"><option value="mate">Face contre face</option><option value="align" ${k.type=='align'?'selected':''}>Aligner (même plan)</option></select></div>
+  <div class="f"><span>Décalage (mm)</span><input id="kO" value="${k.off||0}"></div><div class="bk"><button id="kF">⇄ Inverser</button><button id="kX">🗑 Supprimer</button></div>
+  <p class="note">Quand la pièce de référence bouge, l'autre suit. Elle peut encore glisser le long de la face.</p>`;
+  $('kT').onchange=()=>{snap();k.type=$('kT').value;rebuild()};$('kO').onchange=()=>{const v=parseFloat($('kO').value.replace(',','.'));if(isFinite(v)){snap();k.off=v}rebuild()};
+  $('kF').onclick=()=>{snap();k.flip=!k.flip;rebuild()};$('kX').onclick=()=>{snap();M.cons=cons().filter(x=>x!==k);sel=null;rebuild()}}
+function groundComp(c){const g=[];group.traverse(o=>{if(o.userData.comp!=null&&descIds(c).includes(o.userData.comp)&&o.isMesh)g.push(o)});if(!g.length)return;const b=new THREE.Box3();g.forEach(o=>b.expandByObject(o));const W=worldMat(rootOf(c));W.premultiply(new THREE.Matrix4().makeTranslation(0,-b.min.y,0));setWorld(rootOf(c),W)}
+function deleteComps(ids){const all=new Set();ids.forEach(id=>{const c=compOf(id);if(c)descIds(c).forEach(i=>all.add(i))});
+  if([...all].some(i=>isLocked(compOf(i)))){alert('Une pièce verrouillée ne peut pas être supprimée. Déverrouillez-la d\'abord.');return}
+  snap();const fids=new Set(M.feats.filter(f=>all.has(f.comp)).map(f=>f.id));M.feats=M.feats.filter(f=>!fids.has(f.id)&&!fids.has(f.parent));M.comps=comps().filter(c=>!all.has(c.id));
+  M.cons=cons().filter(k=>!all.has(k.a.comp)&&!all.has(k.b.comp));sel=null;selSet=[];rebuild()}
 
 // ---------- Paramètres ----------
 function renderProps(){const P=$('props'),f=fid(sel),c=selComp();
-  if(c){const fs=bodies().filter(b=>b.comp==c.id),kg=fs.reduce((s,b)=>s+(b._kg||0)*(b.qty||1),0);
-    P.innerHTML=`<h4>🧩 Composant</h4><div class="f"><span>Nom</span><input id="cN"></div>
-    ${[['X (mm)','x'],['Y (mm)','y'],['Z (mm)','z'],['Rotation X (°)','rx'],['Rotation Y (°)','ry'],['Rotation Z (°)','rz']].map(([l,k])=>`<div class="f"><span>${l}</span><input data-k="${k}" value="${+(c[k]||0).toFixed(2)}"></div>`).join('')}
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0"><button data-r="ry">↻ 90° Y</button><button data-r="rx">↻ 90° X</button><button data-r="rz">↻ 90° Z</button><button id="cG">⤓ Poser au sol</button></div>
-    <p class="note">Glissez la pièce dans la vue 3D pour la déplacer (Maj = monter/descendre). ${fs.length} corps · ${kg.toFixed(3)} kg</p>
-    <div style="display:flex;gap:6px;flex-wrap:wrap"><button id="cD">Dupliquer</button><button id="cX">🗑 Supprimer</button></div>`;
-    $('cN').value=c.name;$('cN').onchange=()=>{snap();c.name=$('cN').value||c.name;rebuild()};
-    P.querySelectorAll('[data-k]').forEach(i=>i.onchange=()=>{const v=parseFloat(i.value.replace(',','.'));if(isFinite(v)){snap();c[i.dataset.k]=v}rebuild()});
-    P.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{snap();c[b.dataset.r]=((c[b.dataset.r]||0)+90)%360;rebuild()});
-    $('cG').onclick=()=>{snap();const g=group.children.find(o=>o.userData.comp==c.id);if(g){const b=new THREE.Box3().setFromObject(g);c.y=(c.y||0)-b.min.y}rebuild()};
-    $('cX').onclick=()=>{snap();M.feats=M.feats.filter(b=>b.comp!=c.id);M.comps=comps().filter(x=>x!==c);sel=null;rebuild()};
-    $('cD').onclick=()=>{snap();const nc={...c,id:M.nid++,name:c.name+' (copie)',x:(c.x||0)+30};comps().push(nc);copyFeats(M.feats.filter(b=>b.comp==c.id),nc.id);sel='c'+nc.id;rebuild()};return}
+  if(sel=='multi'&&selSet.length){multiProps(P);return}const k=selCon();if(k){conProps(P,k);return}
+  if(c){compProps(P,c);return}
   if(!f){P.innerHTML=`<h4>Paramètres</h4><p class="note">Sélectionnez une fonction dans l'arbre ou cliquez sur une pièce en 3D.<br><br>
   <b>Comme Pro/E :</b> chaque fonction garde ses cotes. Changez une valeur → la pièce est régénérée.<br><br>
   • <b>Extrusion</b> : profil (rectangle avec congés, cercle, polygone) + profondeur.<br>• <b>Révolution</b> : profil « rayon,hauteur » tourné autour de l'axe.<br>
@@ -208,7 +296,12 @@ function renderProps(){const P=$('props'),f=fid(sel),c=selComp();
     <tr><td>Encombrement</td><td>${s.x.toFixed(1)} × ${s.y.toFixed(1)} × ${s.z.toFixed(1)} mm</td></tr></table>`}
   if(f.type=='hole'||f.type=='cut')h+='<p class="note">U / V = position dans l\'esquisse de l\'extrusion parente (0,0 = centre du profil rectangle/cercle).</p>';
   h+=`<div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap"><button id="dupB">Dupliquer</button><button id="delB">🗑 Supprimer</button><button id="upB">▲</button><button id="dnB">▼</button></div>`;
-  P.innerHTML=h;
+  if(!f.comp&&(f.type=='extrude'||f.type=='revolve'))h+=`<div class="bk"><button id="mkC">🧩 Faire un composant (déplaçable, copiable)</button></div>`;
+  if(f.type=='extrude'&&(f.profile=='rect'||f.profile=='circle'))h+='<p class="note">Astuce : tirez les poignées colorées dans la vue 3D pour étirer la pièce.</p>';
+  const fl=f.comp&&isLocked(compOf(f.comp))||(fid(f.parent)&&fid(f.parent).comp&&isLocked(compOf(fid(f.parent).comp)));
+  if(fl)h='<p class="note lk">🔒 Cette pièce est verrouillée : déverrouillez le composant pour la modifier.</p>'+h;
+  P.innerHTML=h;if(fl){P.querySelectorAll('input,select,textarea,button').forEach(x=>x.disabled=true);return}
+  if($('mkC'))$('mkC').onclick=()=>{snap();const c={id:M.nid++,name:f.name,x:0,y:0,z:0,rx:0,ry:0,rz:0};comps().push(c);f.comp=c.id;sel='c'+c.id;rebuild()};
   P.querySelectorAll('[data-i]').forEach(el=>el.onchange=()=>{const x=F[el.dataset.i];let v=el.value;
     if(x.kind=='num'){v=parseFloat(v.replace(',','.'));if(!isFinite(v)){renderProps();return}if(['w','h','d','depth','qty','n'].includes(x.k)&&v<=0){renderProps();return}}
     if(x.kind=='bool')v=v=='1';if(x.k=='parent')v=+v;snap();f[x.k]=v;rebuild()});
@@ -219,22 +312,78 @@ function renderProps(){const P=$('props'),f=fid(sel),c=selComp();
 function massTable(){const b=bodies().filter(f=>f.on&&f._kg!=null);if(!b.length&&!imports.length)return'';let t=0;
   return'<h4>Nomenclature</h4><table>'+b.map(f=>{t+=f._kg*f.qty;return`<tr><td>${f.name} ×${f.qty}<br><span class="note">${f.mat}</span></td><td>${(f._kg*f.qty).toFixed(3)} kg</td></tr>`}).join('')+imports.map(im=>{t+=im.kg;const s=im.size;return`<tr><td>📥 ${im.name}<br><span class="note">acier (estimé) · ${s.x.toFixed(1)}×${s.y.toFixed(1)}×${s.z.toFixed(1)} mm</span></td><td>${im.kg.toFixed(3)} kg</td></tr>`}).join('')+`<tr><td><b>Total</b></td><td><b>${t.toFixed(3)} kg</b></td></tr></table>`}
 
-// ---------- Sélection 3D ----------
-const ray=new THREE.Raycaster();let down=null;
-R.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};const c=selComp();if(!c||measuring)return;
-  const r=R.domElement.getBoundingClientRect();ray.setFromCamera({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1},cam);
-  const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh&&x.object.userData.comp==c.id);if(!h.length)return;
-  ctl.enabled=false;snap();const p0=h[0].point.clone(),vert=e.shiftKey,n=vert?cam.getWorldDirection(new THREE.Vector3()).setY(0).normalize():new THREE.Vector3(0,1,0);
-  const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(n,p0),st={x:c.x||0,y:c.y||0,z:c.z||0},q=new THREE.Vector3(),g=group.children.find(o=>o.userData.comp==c.id);let moved=false;
-  const mv=ev=>{ray.setFromCamera({x:(ev.clientX-r.left)/r.width*2-1,y:-(ev.clientY-r.top)/r.height*2+1},cam);if(!ray.ray.intersectPlane(plane,q))return;const d=q.sub(p0),sn=v=>Math.round(v);moved=true;
-    if(vert)c.y=sn(st.y+d.y);else{c.x=sn(st.x+d.x);c.z=sn(st.z+d.z)}if(g)g.position.set(c.x,c.y,c.z);$('info').textContent=`🧩 ${c.name}  X ${c.x}  Y ${c.y}  Z ${c.z} mm`};
+// ---------- Sélection, flèches, poignées, contraintes ----------
+const ray=new THREE.Raycaster();let down=null,consPick=0,consA=null;
+const ndc=(e,r)=>({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1});
+tc.addEventListener('mouseDown',()=>snap());
+tc.addEventListener('objectChange',()=>{const o=tc.object,c=o&&compOf(o.userData.comp);if(!c)return;const r=v=>Math.round(v*100)/100;
+  c.x=r(o.position.x);c.y=r(o.position.y);c.z=r(o.position.z);c.rx=r(o.rotation.x/D2R);c.ry=r(o.rotation.y/D2R);c.rz=r(o.rotation.z/D2R);$('info').textContent=`🧩 ${c.name}   X ${c.x}  Y ${c.y}  Z ${c.z}   Rot ${c.rx}° ${c.ry}° ${c.rz}°`});
+tc.addEventListener('mouseUp',()=>{down=null;setTimeout(rebuild,0)});
+R.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};if(tc.dragging||tc.axis||measuring||consPick)return;const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);
+  // 1) poignées d'étirement
+  if(handles){const h=ray.intersectObjects(handles.children);if(h.length){const H=h[0].object.userData.h,f=fid(H.f);if(!f)return;ctl.enabled=false;snap();
+    const m=h[0].object.matrixWorld,org=new THREE.Vector3().setFromMatrixPosition(m),dir=new THREE.Vector3(0,1,0).transformDirection(m).normalize();
+    const tOf=ev=>{ray.setFromCamera(ndc(ev,r),cam);const ro=ray.ray.origin,rd=ray.ray.direction,w0=org.clone().sub(ro),b=dir.dot(rd),d=dir.dot(w0),ee=rd.dot(w0),den=1-b*b;return den<1e-6?0:(b*ee-d)/den};
+    const t0=tOf(e),st={w:f.w,h:f.h,d:f.d,depth:f.depth,u:f.u||0,v:f.v||0,x:f.x||0,y:f.y||0,z:f.z||0},stp=M.step||1;
+    const mv=ev=>{let dl=Math.round((tOf(ev)-t0)/stp)*stp;const S=H.sg;
+      if(H.ax=='x'&&f.profile=='rect'){const nw=Math.max(1,st.w+dl);dl=nw-st.w;f.w=nw;f.u=st.u+S*dl/2}
+      else if(H.ax=='x'){const nd=Math.max(1,st.d+2*dl);f.d=nd}
+      else if(H.ax=='y'){const nh=Math.max(1,st.h+dl);dl=nh-st.h;f.h=nh;f.v=st.v+S*dl/2}
+      else{const nd=Math.max(1,st.depth+(f.sym?2*dl:dl));dl=f.sym?(nd-st.depth)/2:nd-st.depth;f.depth=nd;
+        if(S<0&&!f.sym){const z=ZDIR[f.plane]||[0,0,1];f.x=st.x-z[0]*dl;f.y=st.y-z[1]*dl;f.z=st.z-z[2]*dl}}
+      $('info').textContent=f.profile=='rect'?`↔ ${f.w} × ${f.h} × ${f.depth} mm`:`↔ Ø${f.d} × ${f.depth} mm`;rebuild()};
+    const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);ctl.enabled=true;down=null;rebuild()};
+    addEventListener('pointermove',mv);addEventListener('pointerup',up);return}}
+  // 2) glisser le composant sélectionné directement
+  const c=selComp();if(!c||isLocked(c))return;const ids=descIds(c);
+  const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh&&ids.includes(x.object.userData.comp));if(!h.length)return;
+  const RC=rootOf(c);ctl.enabled=false;snap();const p0=h[0].point.clone(),vert=e.shiftKey,n=vert?cam.getWorldDirection(new THREE.Vector3()).setY(0).normalize():new THREE.Vector3(0,1,0);
+  const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(n,p0),W0=worldMat(RC),q=new THREE.Vector3(),stp=M.step||1;let moved=false;
+  const mv=ev=>{ray.setFromCamera(ndc(ev,r),cam);if(!ray.ray.intersectPlane(plane,q))return;const d=q.sub(p0),sn=v=>Math.round(v/stp)*stp;moved=true;
+    const W=new THREE.Matrix4().makeTranslation(vert?0:sn(d.x),vert?sn(d.y):0,vert?0:sn(d.z)).multiply(W0);setWorld(RC,W);
+    const g=[];group.traverse(o=>{if(o.userData&&o.userData.comp==RC.id&&o.isGroup)g.push(o)});if(g[0]){g[0].position.set(RC.x,RC.y,RC.z)}$('info').textContent=`🧩 ${RC.name}  X ${RC.x}  Y ${RC.y}  Z ${RC.z} mm`};
   const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);ctl.enabled=true;if(moved){down=null;rebuild()}else undoS.pop()};
   addEventListener('pointermove',mv);addEventListener('pointerup',up)});
 R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down.x,e.clientY-down.y)>4)return;const r=R.domElement.getBoundingClientRect();
-  ray.setFromCamera({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1},cam);
-  const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh);
+  ray.setFromCamera(ndc(e,r),cam);const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh);
   if(measuring){if(!h.length)return;measurePick(h[0]);return}
-  const o=h.length?h[0].object:null;sel=o?(o.userData.comp?'c'+o.userData.comp:o.userData.id||null):null;rebuild()});
+  if(consPick){if(!h.length||!h[0].object.userData.comp||!h[0].face){$('info').textContent='🔗 Cliquez sur une face d\'une pièce de l\'assemblage (Échap pour annuler)';return}consFace(h[0]);return}
+  const o=h.length?h[0].object:null;
+  if(!o){sel=null;selSet=[];rebuild();return}
+  if(o.userData.comp){const top=rootOf(compOf(o.userData.comp));if(e.ctrlKey||e.metaKey||e.shiftKey)toggleMulti(top.id);else{sel=(selComp()&&rootOf(selComp())===top&&e.detail>1)?'c'+o.userData.comp:'c'+top.id;selSet=[]}}
+  else{sel=o.userData.id||null;selSet=[]}rebuild()});
+R.domElement.addEventListener('dblclick',e=>{const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh);
+  if(h.length&&h[0].object.userData.id){sel=h[0].object.userData.id;selSet=[];rebuild();$('info').textContent='✏ Fonction « '+fid(sel).name+' » : tirez les poignées colorées pour l\'étirer'}});
+function startCons(){if(comps().length<2){alert('Il faut au moins 2 pièces dans l\'assemblage.');return}consPick=1;consA=null;tc.detach();$('consB').classList.add('on');$('info').textContent='🔗 1/2 : cliquez la FACE de la pièce qui doit bouger';}
+function consFace(hit){const o=hit.object,c=compOf(o.userData.comp),Wi=worldMat(c).invert(),p=hit.point.clone().applyMatrix4(Wi),n=hit.face.normal.clone().normalize();
+  const rec={comp:c.id,p:[p.x,p.y,p.z].map(v=>Math.round(v*1000)/1000),n:[n.x,n.y,n.z].map(v=>Math.round(v*1e6)/1e6)};
+  if(consPick==1){consA=rec;consPick=2;$('info').textContent='🔗 2/2 : cliquez la FACE de référence sur une autre pièce';return}
+  if(rootOf(compOf(rec.comp))===rootOf(compOf(consA.comp))){$('info').textContent='🔗 Choisissez une face sur une AUTRE pièce';return}
+  snap();const k={id:M.nid++,type:'mate',off:0,a:consA,b:rec};cons().push(k);consPick=0;consA=null;$('consB').classList.remove('on');sel='k'+k.id;rebuild()}
+$('consB').onclick=()=>{if(consPick){consPick=0;$('consB').classList.remove('on');rebuild()}else startCons()};
+// ---------- Copier / coller (répète l'espacement) ----------
+let clip=null,lastPaste=null;
+function copySel(ids){const roots=[...new Set(ids.map(i=>rootOf(compOf(i))).filter(Boolean))];if(!roots.length)return false;const all=new Set();roots.forEach(c=>descIds(c).forEach(i=>all.add(i)));
+  const fs=M.feats.filter(f=>all.has(f.comp)),fids=new Set(fs.map(f=>f.id));
+  clip={roots:roots.map(c=>c.id),comps:JSON.parse(JSON.stringify(comps().filter(c=>all.has(c.id)))),feats:JSON.parse(JSON.stringify(M.feats.filter(f=>fids.has(f.id)||fids.has(f.parent)),(k,v)=>k[0]=='_'?undefined:v)),cons:JSON.parse(JSON.stringify(cons().filter(k=>all.has(k.a.comp)&&all.has(k.b.comp))))};
+  clip.comps.forEach(c=>{if(clip.roots.includes(c.id))delete c.parent;delete c.locked});lastPaste=null;try{localStorage.setItem('drawgene-clip',JSON.stringify(clip))}catch(e){}return true}
+function cloneInto(d,wrapName){const cm={},fm={};let W=null;if(wrapName){W={id:M.nid++,name:wrapName,x:0,y:0,z:0,rx:0,ry:0,rz:0};comps().push(W)}
+  (d.comps||[]).forEach(c=>cm[c.id]=M.nid++);
+  (d.comps||[]).forEach(c=>{const n=JSON.parse(JSON.stringify(c));n.id=cm[c.id];if(c.parent!=null&&cm[c.parent])n.parent=cm[c.parent];else if(W)n.parent=W.id;else delete n.parent;comps().push(n)});
+  (d.feats||[]).forEach(f=>fm[f.id]=M.nid++);
+  (d.feats||[]).forEach(f=>{const n=JSON.parse(JSON.stringify(f),(k,v)=>k[0]=='_'?undefined:v);n.id=fm[f.id];if(n.parent!=null)n.parent=fm[n.parent]??n.parent;
+    if(n.type=='extrude'||n.type=='revolve'){if(f.comp!=null&&cm[f.comp])n.comp=cm[f.comp];else if(W)n.comp=W.id;else delete n.comp}else delete n.comp;M.feats.push(n)});
+  (d.cons||[]).forEach(k=>{if(cm[k.a.comp]&&cm[k.b.comp])cons().push({...JSON.parse(JSON.stringify(k)),id:M.nid++,a:{...k.a,comp:cm[k.a.comp]},b:{...k.b,comp:cm[k.b.comp]}})});
+  return{W,cm}}
+function pasteClip(doRebuild=true,keepPos=false){if(!clip){try{clip=JSON.parse(localStorage.getItem('drawgene-clip')||'null')}catch(e){}}if(!clip)return[];
+  if(doRebuild)snap();const src=clip.comps.find(c=>c.id==clip.roots[0])||{},sp=[src.x||0,src.y||0,src.z||0];const {cm}=cloneInto(clip,null),roots=clip.roots.map(i=>compOf(cm[i])).filter(Boolean);
+  if(!keepPos){let shift=[100,0,0];const prev=lastPaste&&compOf(lastPaste.to);
+    if(prev){const cur=[(prev.x||0)-sp[0],(prev.y||0)-sp[1],(prev.z||0)-sp[2]],d=cur.map((v,i)=>v-lastPaste.prevShift[i]);shift=cur.map((v,i)=>v+d[i]);lastPaste={to:roots[0].id,prevShift:cur}}
+    else lastPaste={to:roots[0].id,prevShift:[0,0,0]};
+    roots.forEach(c=>{c.x=(c.x||0)+shift[0];c.y=(c.y||0)+shift[1];c.z=(c.z||0)+shift[2]})}
+  if(doRebuild){if(roots.length==1){sel='c'+roots[0].id;selSet=[]}else{selSet=roots.map(c=>c.id);sel='multi'}rebuild();$('info').textContent='📋 Collé — déplacez la copie puis Ctrl+V : la suivante gardera le même espacement'}
+  return roots}
+
 // ---------- Mesure 3D ----------
 let measuring=false,mA=null;const mG=new THREE.Group();scene.add(mG);const measures=[];
 function measurePick(hit){let p=hit.point.clone();const o=hit.object,f=hit.face,pos=o.geometry.attributes.position,tol=bbox().getSize(new THREE.Vector3()).length()*0.02;
@@ -279,21 +428,15 @@ function download(name,data,type){const a=document.createElement('a');a.download
 const cleanM=()=>JSON.parse(JSON.stringify(M,(k,v)=>k.startsWith('_')?undefined:v));
 function thumb3D(){setView('iso');R.render(scene,cam);const c=document.createElement('canvas');c.width=200;c.height=150;const s=R.domElement,k=Math.max(s.width/200,s.height/150);
   c.getContext('2d').fillStyle='#1a1d23';c.getContext('2d').fillRect(0,0,200,150);c.getContext('2d').drawImage(s,(200-s.width/k)/2,(150-s.height/k)/2,s.width/k,s.height/k);return c.toDataURL('image/jpeg',.8)}
-function saveToLib(name){return DGLib.add({kind:'3d',name,data:cleanM(),thumb:thumb3D()})}
+function saveToLib(name){return DGLib.add({kind:'3d',name,sub:comps().length?'asm':'prt',data:cleanM(),thumb:thumb3D()})}
 $('saveB').onclick=()=>{if(!bodies().length){alert('Rien à enregistrer : aucune pièce.');return}const n=prompt('Nom de la pièce / de l\'assemblage :',M.name||'Pièce');if(!n)return;M.name=n.trim();save();
   saveToLib(M.name);download(M.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\\/:*?"<>|]+/g,'_')+'.drawgene',JSON.stringify(cleanM(),null,1),'application/json');$('info').textContent='💾 « '+M.name+' » enregistré et ajouté à la bibliothèque'};
-function copyFeats(src,compId){const map={};src.forEach(f=>map[f.id]=M.nid++);
-  M.feats.filter(f=>src.some(s=>s.parent&&s.parent==f.id));const out=[];
-  src.forEach(f=>{const c=JSON.parse(JSON.stringify(f));c.id=map[f.id];if(c.parent!=null)c.parent=map[c.parent]??c.parent;if(c.type=='extrude'||c.type=='revolve')c.comp=compId;else delete c.comp;out.push(c)});
-  M.feats.push(...out);return out}
 function insert3D(it,cx,cy){const d=it.data;if(!d||!d.feats||!d.feats.length)return;const r=R.domElement.getBoundingClientRect();
   ray.setFromCamera({x:(cx-r.left)/r.width*2-1,y:-(cy-r.top)/r.height*2+1},cam);const q=new THREE.Vector3();if(!ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),q))q.set(0,0,0);
-  const saved=M;M={feats:d.feats,comps:d.comps||[]};const bb=new THREE.Box3();
-  d.feats.filter(f=>(f.type=='extrude'||f.type=='revolve')&&f.on!==false).forEach(f=>{try{const g=buildGeom(f);if(g){g.computeBoundingBox();bb.union(g.boundingBox)}}catch(e){}});M=saved;
-  if(bb.isEmpty())bb.set(new THREE.Vector3(),new THREE.Vector3());const ctr=bb.getCenter(new THREE.Vector3());
-  snap();const c={id:M.nid++,name:it.name,x:Math.round(q.x-ctr.x),y:Math.round(-bb.min.y),z:Math.round(q.z-ctr.z),rx:0,ry:0,rz:0};comps().push(c);
-  copyFeats(d.feats.map(f=>{const g={...f};delete g.comp;return g}),c.id);sel='c'+c.id;rebuild();if(bodies().length==bodies().filter(b=>b.comp==c.id).length)fitView();
-  $('info').textContent='🧩 « '+it.name+' » ajouté — glissez-le dans la vue pour le placer'}
+  snap();const {W}=cloneInto(d,it.name);rebuild();const b=new THREE.Box3();group.traverse(o=>{if(o.isMesh&&o.userData.comp!=null&&descIds(W).includes(o.userData.comp))b.expandByObject(o)});
+  if(!b.isEmpty()){const c=b.getCenter(new THREE.Vector3());W.x=Math.round(q.x-c.x);W.z=Math.round(q.z-c.z);W.y=Math.round(-b.min.y)}
+  if(!(d.comps&&d.comps.length)){/* pièce simple : pas de niveau inutile */}sel='c'+W.id;selSet=[];rebuild();if(comps().length==1&&!bodies().some(f=>!f.comp))fitView();
+  $('info').textContent='🧩 « '+it.name+' » ajouté — flèches pour le placer, 🔗 Contrainte pour l\'accoler'}
 $('openB').onclick=()=>$('file').click();
 function openText(t,fname){let o;try{o=JSON.parse(t)}catch(x){alert('Ce fichier n\'est pas un dessin drawGene.');return}
   if(o.ents){try{localStorage.setItem('planpro',JSON.stringify(o))}catch(e){}location.href='plan.html';return}
@@ -314,8 +457,77 @@ $('stlB').onclick=()=>{let s='solid piece\n';const a=new THREE.Vector3(),b=new T
       n.subVectors(c,b).cross(new THREE.Vector3().subVectors(a,b)).normalize();s+=`facet normal ${n.x} ${n.y} ${n.z}\nouter loop\nvertex ${a.x} ${a.y} ${a.z}\nvertex ${b.x} ${b.y} ${b.z}\nvertex ${c.x} ${c.y} ${c.z}\nendloop\nendfacet\n`}});
   download('piece.stl',s+'endsolid piece\n','model/stl')};
 $('treeT').onclick=()=>$('tree').classList.toggle('open');$('propT').onclick=()=>$('props').classList.toggle('open');
-addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if((e.ctrlKey||e.metaKey)&&e.key=='z'){e.preventDefault();$('undoB').click()}
-  if((e.ctrlKey||e.metaKey)&&e.key=='y'){e.preventDefault();$('redoB').click()}if(e.key=='Delete'&&sel){$('delB')&&$('delB').click()}});
+// ---------- Clavier ----------
+addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const K=e.key,ctrl=e.ctrlKey||e.metaKey;
+  if(ctrl&&K.toLowerCase()=='z'){e.preventDefault();$('undoB').click();return}if(ctrl&&K.toLowerCase()=='y'){e.preventDefault();$('redoB').click();return}
+  if(K=='Escape'){if(consPick){consPick=0;$('consB').classList.remove('on')}sel=null;selSet=[];rebuild();return}
+  const c=selComp(),ids=selSet.length?selSet:(c?[c.id]:[]);
+  if(ctrl&&K.toLowerCase()=='c'&&ids.length){e.preventDefault();if(copySel(ids))$('info').textContent='📋 Copié ('+ids.length+') — Ctrl+V pour coller';return}
+  if(ctrl&&K.toLowerCase()=='v'){e.preventDefault();pasteClip();return}
+  if(ctrl&&K.toLowerCase()=='d'&&ids.length){e.preventDefault();copySel(ids);pasteClip();return}
+  if(K=='Delete'||K=='Backspace'){if(ids.length){deleteComps(ids);return}if(selCon()){snap();M.cons=cons().filter(x=>x!==selCon());sel=null;rebuild();return}if(fid(sel))$('delB')&&$('delB').click();return}
+  if(K.toLowerCase()=='g'&&!ctrl){setTM('translate');return}if(K.toLowerCase()=='r'&&!ctrl){setTM('rotate');return}
+  const mv={ArrowLeft:[-1,0,0],ArrowRight:[1,0,0],ArrowUp:[0,0,-1],ArrowDown:[0,0,1],PageUp:[0,1,0],PageDown:[0,-1,0]}[K];
+  if(mv&&ids.length){e.preventDefault();const roots=[...new Set(ids.map(i=>rootOf(compOf(i))))];if(roots.some(isLocked)){$('info').textContent='🔒 Pièce verrouillée';return}
+    const st=(M.step||1)*(e.shiftKey?10:1);snap();roots.forEach(r=>{if(e.altKey&&mv[1]==0){r.ry=((r.ry||0)+(mv[0]+mv[2]>0?90:-90)+360)%360}else{r.x=(r.x||0)+mv[0]*st;r.y=(r.y||0)+mv[1]*st;r.z=(r.z||0)+mv[2]*st}});rebuild()}});
+function setTM(m){tc.setMode(m);$('tmB').textContent=m=='rotate'?'⟳ Tourner':'✥ Déplacer'}
+$('tmB').onclick=()=>setTM(tc.getMode()=='translate'?'rotate':'translate');
+$('lockAll').onclick=()=>{snap();M.locked=!M.locked;rebuild()};
+// ---------- Vue en coupe ----------
+function updSec(){const b=bbox(),ax=$('secA').value.toLowerCase(),t=+$('secR').value/1000,v=b.min[ax]+(b.max[ax]-b.min[ax])*t,n=new THREE.Vector3(ax=='x'?1:0,ax=='y'?1:0,ax=='z'?1:0);
+  secPlane.setFromNormalAndCoplanarPoint(secFlip?n:n.clone().negate(),new THREE.Vector3(ax=='x'?v:0,ax=='y'?v:0,ax=='z'?v:0))}
+let secFlip=false;
+$('secB').onclick=()=>{secOn=!secOn;$('secB').classList.toggle('on',secOn);$('secP').hidden=!secOn;$('secP').style.display=secOn?'inline-flex':'none';if(secOn)updSec();rebuild()};
+$('secR').oninput=()=>updSec();$('secA').onchange=()=>updSec();$('secF').onclick=()=>{secFlip=!secFlip;updSec()};
+// ---------- Bois de construction ----------
+const LUMBER={'2x3':[38,64],'2x4':[38,89],'2x6':[38,140],'2x8':[38,184],'2x10':[38,235],'2x12':[38,286],'4x4':[89,89],'6x6':[140,140],'1x4':[19,89],'1x6':[19,140]};
+const SHEETS={'Contreplaqué 1/2"':12.7,'Contreplaqué 5/8"':15.9,'Contreplaqué 3/4"':19.1,'OSB 7/16"':11.1,'Gypse 1/2"':12.7};
+const STOCK=[2438,3048,3658,4267,4877],FT=v=>{const e=Math.round(v/25.4*8),f=Math.floor(e/96),r=(e-f*96)/8,w=Math.floor(r),fr=Math.round((r-w)*8),g=(a,b)=>b?g(b,a%b):a,gg=g(fr,8);return`${f}'`+(r?` ${w}${fr?` ${fr/gg}/${8/gg}`:''}"`:'')};
+function parseMM(s){s=String(s).trim().replace(',','.');let m=s.match(/^(\d+(?:\.\d+)?)\s*'\s*(\d+(?:\.\d+)?)?(?:\s+(\d+)\/(\d+))?/);if(m)return((+m[1])*12+(+m[2]||0)+(m[3]?m[3]/m[4]:0))*25.4;
+  m=s.match(/^(\d+(?:\.\d+)?)(?:\s+(\d+)\/(\d+))?\s*(po|"|in)$/);if(m)return(+m[1]+(m[2]?m[2]/m[3]:0))*25.4;m=s.match(/^(\d+(?:\.\d+)?)\s*(mm)?$/);return m?+m[1]:NaN}
+$('woodB').onclick=()=>{sel=null;selSet=[];tc.detach();const P=$('props');$('props').classList.add('open');
+  P.innerHTML=`<h4>🪵 Ajouter du bois</h4><div class="f"><span>Type</span><select id="wT">${Object.keys(LUMBER).map(k=>`<option ${k=='2x4'?'selected':''}>${k}</option>`).join('')}${Object.keys(SHEETS).map(k=>`<option>${k}</option>`).join('')}</select></div>
+  <div class="f"><span>Longueur</span><select id="wL"><option value="2353">Montant 92 5/8"</option><option value="2438">8'</option><option value="3048">10'</option><option value="3658">12'</option><option value="4267">14'</option><option value="4877">16'</option><option value="x">Autre…</option></select></div>
+  <div class="f" id="wLx" hidden style="display:none"><span>Longueur (mm ou 7' 6")</span><input id="wLv" value="2000"></div>
+  <div class="f"><span>Position</span><select id="wO"><option value="y">Debout (montant)</option><option value="x">Couché sur X (lisse)</option><option value="z">Couché sur Z</option></select></div>
+  <div class="f"><span>Quantité</span><input id="wN" value="1"></div><div class="f"><span>Espacement (mm)</span><input id="wE" value="406"></div>
+  <div class="bk"><button id="wGo">＋ Ajouter</button></div>
+  <p class="note">Dimensions réelles : 2x4 = 38 × 89 mm, 2x6 = 38 × 140 mm. Feuilles 4' × 8'. Avec une quantité > 1, les pièces sont posées à l'espacement choisi (406 = 16 po c/c).</p>`;
+  $('wL').onchange=()=>{const x=$('wL').value=='x';$('wLx').hidden=!x;$('wLx').style.display=x?'grid':'none'};
+  $('wT').onchange=()=>{const sh=SHEETS[$('wT').value]!=null;$('wL').disabled=sh};
+  $('wGo').onclick=()=>{const t=$('wT').value,sh=SHEETS[t],o=$('wO').value,n=Math.max(1,Math.round(+$('wN').value)),sp=parseFloat($('wE').value.replace(',','.'))||406;
+    let L=$('wL').value=='x'?parseMM($('wLv').value):+$('wL').value;if(!(L>0)){alert('Longueur invalide');return}snap();
+    const tgt=ctl.target,base={x:Math.round(tgt.x),z:Math.round(tgt.z)};
+    for(let i=0;i<n;i++){const c={id:M.nid++,name:sh?t:`${t} × ${FT(L)}`,x:base.x+(o=='x'?0:i*sp),y:0,z:base.z+(o=='x'?i*sp:0),rx:sh?(o=='y'?0:-90):(o=='y'?-90:0),ry:o=='x'?90:0,rz:0,stock:{type:t,len:sh?null:Math.round(L)}};comps().push(c);
+      const f=sh?{type:'extrude',name:t,plane:'XY',profile:'rect',w:1220,h:2440,d:10,r:0,pts:'',u:0,v:1220,depth:sh,sym:false,x:0,y:0,z:0,mat:'bois',qty:1,on:true}
+        :{type:'extrude',name:`${t} ${Math.round(L)} mm`,plane:'XY',profile:'rect',w:LUMBER[t][1],h:LUMBER[t][0],d:10,r:0,pts:'',u:0,v:0,depth:Math.round(L),sym:false,x:0,y:0,z:0,mat:'bois',qty:1,on:true};
+      f.id=M.nid++;f.comp=c.id;M.feats.push(f);groundLater.push(c.id)}
+    rebuild();groundLater.forEach(id=>{const c=compOf(id);if(c)groundComp(c)});groundLater=[];sel=null;rebuild();if(bodies().length<=n)fitView();$('info').textContent=`🪵 ${n} × ${t} ajouté(s)`}};
+let groundLater=[];
+// ---------- Liste de coupe automatique ----------
+function cutList(){const lum={},sheets={},other=[];group.updateMatrixWorld(true);
+  bodies().filter(f=>f.on&&f.type=='extrude'&&f.profile=='rect').forEach(f=>{const dims=[f.w,f.h,f.depth].map(v=>Math.round(v*10)/10).sort((a,b)=>a-b),q=f.qty||1;
+    const lt=Object.entries(LUMBER).find(([k,[a,b]])=>Math.abs(dims[0]-a)<1.5&&Math.abs(dims[1]-b)<1.5);
+    const st=Object.entries(SHEETS).find(([k,t])=>Math.abs(dims[0]-t)<.6&&dims[1]>=300);
+    if(lt){(lum[lt[0]]=lum[lt[0]]||[]).push(...Array(q).fill(dims[2]))}else if(st){(sheets[st[0]]=sheets[st[0]]||[]).push(...Array(q).fill([dims[1],dims[2]]))}else other.push({name:f.name,dims,q,mat:f.mat})});
+  const kerf=3,res={};Object.entries(lum).forEach(([t,pcs])=>{pcs.sort((a,b)=>b-a);const bins=[];
+    pcs.forEach(p=>{let b=bins.find(b=>b.left>=p+(b.cuts.length?kerf:0));if(!b){const L=STOCK.find(s=>s>=p)||STOCK[STOCK.length-1];b={len:L,left:L,cuts:[],tooLong:p>L};bins.push(b)}b.left-=p+(b.cuts.length?kerf:0);b.cuts.push(p)});
+    bins.forEach(b=>{const used=b.len-b.left,L=STOCK.find(s=>s>=used)||b.len;b.left+=L-b.len;b.len=L});res[t]={bins,pieces:pcs}});
+  return{res,sheets,other}}
+$('cutlB').onclick=()=>{const {res,sheets,other}=cutList(),P=$('props');$('props').classList.add('open');sel=null;selSet=[];tc.detach();let h='<h4>📋 Liste de coupe</h4>',csv=['Type;Longueur planche;Coupes (mm);Chute (mm)'];
+  if(!Object.keys(res).length&&!Object.keys(sheets).length&&!other.length){P.innerHTML=h+'<p class="note">Aucune pièce. Ajoutez du 🪵 Bois ou des extrusions rectangulaires.</p>';return}
+  Object.entries(res).forEach(([t,{bins,pieces}])=>{const tot=bins.reduce((s,b)=>s+b.len,0),use=pieces.reduce((s,p)=>s+p,0),cnt={};bins.forEach(b=>cnt[b.len]=(cnt[b.len]||0)+1);
+    const grp={};pieces.forEach(p=>grp[p]=(grp[p]||0)+1);
+    h+=`<h4>${t} — ${pieces.length} morceau(x)</h4><table>${Object.entries(cnt).sort((a,b)=>a[0]-b[0]).map(([l,n])=>`<tr><td>À acheter : ${t} ${FT(+l)}</td><td><b>${n}</b></td></tr>`).join('')}
+    <tr><td>Perte</td><td>${(100-use/tot*100).toFixed(1)} %</td></tr></table><p class="note">Coupes : ${Object.entries(grp).sort((a,b)=>b[0]-a[0]).map(([l,n])=>`${n} × ${l} mm (${FT(+l)})`).join(' · ')}</p>
+    <details><summary class="note" style="cursor:pointer">Plan de coupe planche par planche</summary><table>${bins.map((b,i)=>`<tr><td>#${i+1} ${FT(b.len)}${b.tooLong?' ⚠ trop long':''}</td><td>${b.cuts.join(' + ')} · chute ${Math.round(b.left)}</td></tr>`).join('')}</table></details>`;
+    bins.forEach(b=>csv.push(`${t};${b.len};${b.cuts.join(' + ')};${Math.round(b.left)}`))});
+  Object.entries(sheets).forEach(([t,pcs])=>{const a=pcs.reduce((s,[x,y])=>s+x*y,0),full=pcs.filter(([x,y])=>x>=1215&&y>=2430).length,part=pcs.length-full,need=full+Math.ceil(pcs.filter(([x,y])=>!(x>=1215&&y>=2430)).reduce((s,[x,y])=>s+x*y,0)/(1220*2440)*1.15);
+    h+=`<h4>${t}</h4><table><tr><td>Feuilles 4'×8' à acheter</td><td><b>${need}</b></td></tr><tr><td>Morceaux</td><td>${full} entières + ${part} coupées</td></tr></table>`;csv.push(`${t};4x8;${pcs.length} morceaux;${need} feuilles`)});
+  if(other.length){h+='<h4>Autres pièces</h4><table>'+other.map(o=>`<tr><td>${o.name} (${o.mat})</td><td>${o.dims.join(' × ')} mm ×${o.q}</td></tr>`).join('')+'</table>'}
+  h+=`<div class="bk"><button id="clCsv">⬇ CSV</button></div><p class="note">Optimisé sur les longueurs 8' à 16' avec trait de scie de 3 mm. Les pièces identiques sont regroupées.</p>`;P.innerHTML=h;
+  $('clCsv').onclick=()=>download('liste-de-coupe.csv','﻿'+csv.join('\n'),'text/csv')};
+
 
 
 // ---------- Import / export formats d'échange (Inventor, SolidWorks, AutoCAD, Pro/E...) ----------

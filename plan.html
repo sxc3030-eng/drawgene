@@ -363,6 +363,8 @@ addEventListener('keydown',e=>{const tg=e.target.tagName;if(tg=='INPUT'||tg=='SE
   if(k=='Enter'){entry?applyEntry():finish();return}
   if(k=='Escape'){if(entry){entry='';showEntry()}else if(pts.length)finish();else{sel=null;setTool('select');renderProps()}return}
   if((k=='Delete'||k=='Backspace')&&sel){snap0();const g=byId(sel)&&byId(sel).grp;S.ents=S.ents.filter(x=>x.id!=sel&&!(g&&x.grp==g));sel=null;changed();return}
+  const ar={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[k];
+  if(ar&&sel&&!pts.length){const se=byId(sel);if(!se||layerLock(se.layer))return;e.preventDefault();const st=gridStep()*(e.shiftKey?10:1);snap0();(se.grp?S.ents.filter(x=>x.grp==se.grp):[se]).forEach(x=>translate(x,ar[0]*st,ar[1]*st));attachOpenings();changed();return}
   const t=TOOLS.find(x=>x[3]==k.toUpperCase());if(t&&!e.ctrlKey)setTool(t[0])});
 addEventListener('keyup',e=>{if(e.key=='Shift')shiftDown=false});
 
