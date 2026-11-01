@@ -33,6 +33,8 @@ h4{font-size:11px;text-transform:uppercase;color:var(--mut);margin:10px 0 6px}
 .bk{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
 .pill{display:inline-block;padding:1px 6px;border-radius:9px;background:#3d8bff33;color:#9ec5ff;font-size:10px;margin-left:4px}
 .lk{color:#ffb020}
+.dtag{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;background:#0b2a55e6;color:#9fe0ff;border:1.5px solid #5ec4ff;border-radius:6px;padding:2px 7px;font:600 12px system-ui;cursor:text;white-space:nowrap;user-select:none}
+.dtag:hover{background:#1450a0;color:#fff}.dtag.lk{cursor:default;opacity:.7;border-color:#888;color:#ccc}.dtag input{width:80px;background:transparent;border:0;color:#fff;font:inherit;text-align:center;padding:0;outline:none}
 .note{color:var(--mut);font-size:11px;line-height:1.45;margin-top:6px}
 table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-bottom:1px solid var(--line)}td:last-child{text-align:right}
 @media(max-width:760px){#tree{position:absolute;left:0;top:46px;bottom:0;z-index:5;transform:translateX(-100%);transition:.2s;width:70%}#tree.open{transform:none}
@@ -41,7 +43,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v6</small></b>
+  <b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v7</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a>
   <span class="sep"></span>
   <button data-add="extrude">⬆ Extrusion</button>
@@ -62,7 +64,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
   <div id="tree"></div>
   <div id="view">
     <div id="vbtn"><button data-v="iso">Iso</button><button data-v="front">Face</button><button data-v="top">Dessus</button><button data-v="right">Droite</button><button id="wireB">Filaire</button><button id="edgeB" class="on">Arêtes</button><button id="fitB">Ajuster</button><button id="measB">📏 Mesurer</button><button id="clrM">Effacer mesures</button><button id="tmB" class="on" title="Flèches : déplacer (G) / tourner (R)">✥ Déplacer</button><button id="secB">✂ Vue en coupe</button><span id="secP" hidden style="display:none;align-items:center;gap:4px;background:#22252c;border:1px solid #363a44;border-radius:7px;padding:2px 6px"><select id="secA" style="width:auto"><option>X</option><option selected>Y</option><option>Z</option></select><input type="range" id="secR" min="0" max="1000" value="500" style="width:120px"><button id="secF" title="Inverser le côté">⇄</button></span></div><div id="labels" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>
-    <div id="info"></div>
+    <div id="info"></div><div id="dimtags" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4"></div>
   </div>
   <div id="props"></div>
 </div>
@@ -138,7 +140,7 @@ const group=new THREE.Group();scene.add(group);
 let wire=false,edges=true,house=null;
 function resize(){const r=view.getBoundingClientRect();R.setSize(r.width,r.height);cam.aspect=r.width/r.height;cam.updateProjectionMatrix()}
 addEventListener('resize',resize);
-(function loop(){requestAnimationFrame(loop);ctl.update();try{placeLabels()}catch(e){}R.render(scene,cam)})();
+(function loop(){requestAnimationFrame(loop);ctl.update();try{placeLabels()}catch(e){}try{placeDims()}catch(e){}R.render(scene,cam)})();
 
 const comps=()=>M.comps||(M.comps=[]);const cons=()=>M.cons||(M.cons=[]);const compOf=id=>comps().find(c=>c.id==id);
 const selComp=()=>typeof sel=='string'&&sel[0]=='c'?compOf(+sel.slice(1)):null;
@@ -180,10 +182,30 @@ function rebuild(){solveCons();group.clear();if(handles){scene.remove(handles);h
   const rc=sc?rootOf(sc):null;if(rc&&!isLocked(rc)&&CG[sc.id]&&!measuring&&!consPick){tc.attach(CG[sc.id]);if(!tc.parent)scene.add(tc);tc.setTranslationSnap(M.step||1)}else{tc.detach();if(tc.parent)scene.remove(tc)}
   // poignées d'étirement sur la fonction sélectionnée
   const sf=fid(sel);if(sf&&sf.type=='extrude'&&sf.on&&(sf.profile=='rect'||sf.profile=='circle')&&!(sf.comp&&isLocked(compOf(sf.comp)))&&!measuring)buildHandles(sf,sf.comp&&CG[sf.comp]?CG[sf.comp]:group);
+  buildDimTags(sc,CG);
   $('info').textContent=`Corps: ${tot.n}   Volume: ${(tot.vol/1000).toFixed(1)} cm³   Masse: ${tot.kg.toFixed(3)} kg`+(M.locked?'   🔒 Assemblage verrouillé':'')+(info.length?'\n⚠ '+info.join('\n⚠ '):'');
   $('lockAll').textContent=(M.locked?'🔒':'🔓')+' Assemblage';$('lockAll').classList.toggle('on',!!M.locked);
   renderTree();renderProps();save()}
 const ZDIR={XY:[0,0,1],XZ:[0,1,0],YZ:[1,0,0]};
+// ---------- Cotes cliquables sur la pièce (modifier → la pièce s'ajuste) ----------
+let DTAGS=[];
+function buildDimTags(sc,CG){const box=$('dimtags');box.innerHTML='';DTAGS=[];if(measuring)return;const sf=fid(sel);let list=[];
+  if(sf){const b=sf.type=='extrude'||sf.type=='revolve'?sf:fid(sf.parent);if(b)list=[b]}else if(sc){list=bodies().filter(f=>descIds(sc).includes(f.comp)).slice(0,4)}
+  list.forEach(f=>{if(!f.on||f.type!='extrude')return;const par=f.comp&&CG[f.comp]?CG[f.comp]:group,lk=!!(f.comp&&isLocked(compOf(f.comp)));
+    const Mw=par.matrixWorld.clone().multiply(featFrame(f)),P=(x,y,z)=>new THREE.Vector3(x,y,z).applyMatrix4(Mw),u=f.u||0,v=f.v||0,z0=f.sym?-f.depth/2:0,z1=z0+f.depth;
+    const T=(pos,txt,get,set)=>DTAGS.push({pos,txt,get,set,lk,f});
+    if(f.profile=='rect'){T(P(u,v-f.h/2,z1),f.w,()=>f.w,x=>f.w=x);T(P(u+f.w/2,v,z1),f.h,()=>f.h,x=>f.h=x)}
+    else if(f.profile=='circle')T(P(u+f.d/2,v,z1),'Ø'+f.d,()=>f.d,x=>f.d=x);
+    if(f.profile!='poly'||true)T(P(u+(f.profile=='circle'?f.d/2:f.w/2),v-(f.profile=='circle'?0:f.h/2),(z0+z1)/2),f.depth,()=>f.depth,x=>{if(f.sym)f.depth=x;else f.depth=x});
+    M.feats.filter(h=>h.parent==f.id&&h.on&&h.type=='hole').forEach(h=>{const c=holeCenters(h)[0];T(P(c[0]+h.d/2,c[1],z1),'Ø'+h.d+(h.pattern!='none'?' ×'+h.n:''),()=>h.d,x=>h.d=x)})});
+  DTAGS.forEach(t=>{const el=document.createElement('div');el.className='dtag'+(t.lk?' lk':'');el.textContent=typeof t.txt=='number'?String(Math.round(t.txt*100)/100):t.txt;
+    el.title=t.lk?'Pièce verrouillée':'Cliquer pour modifier la cote';t.el=el;box.append(el);if(t.lk)return;
+    el.onpointerdown=e=>e.stopPropagation();
+    el.onclick=e=>{e.stopPropagation();if(el.querySelector('input'))return;const inp=document.createElement('input');inp.value=String(Math.round(t.get()*100)/100);el.textContent='';el.append(inp);inp.focus();inp.select();let done=false;
+      const ok=()=>{if(done)return;done=true;const x=Math.round(parseMM(inp.value.replace(/^ø/i,''))*10)/10;if(x>0&&Math.abs(x-t.get())>1e-6){snap();t.set(x);const c=t.f.comp&&compOf(t.f.comp);if(c&&c.stock&&c.stock.len){c.stock.len=t.f.depth;c.name=`${c.stock.type} × ${FT(t.f.depth)}`;t.f.name=`${c.stock.type} ${t.f.depth} mm`}$('info').textContent='📏 Cote modifiée : '+x+' mm';rebuild()}else rebuild()};
+      inp.onkeydown=ev=>{ev.stopPropagation();if(ev.key=='Enter')ok();if(ev.key=='Escape'){done=true;rebuild()}};inp.onblur=ok}});
+  placeDims()}
+function placeDims(){if(!DTAGS.length)return;const r=R.domElement.getBoundingClientRect();DTAGS.forEach(t=>{const v=t.pos.clone().project(cam);if(!t.el)return;t.el.style.display=v.z>1||Math.abs(v.x)>1.1||Math.abs(v.y)>1.1?'none':'';t.el.style.left=(v.x+1)/2*r.width+'px';t.el.style.top=(1-v.y)/2*r.height+'px'})}
 function featFrame(f){const o=new THREE.Object3D();if(f.plane=='XZ')o.rotation.x=-Math.PI/2;else if(f.plane=='YZ')o.rotation.y=Math.PI/2;o.position.set(f.x||0,f.y||0,f.z||0);o.updateMatrix();return o.matrix}
 function buildHandles(f,parent){handles=new THREE.Group();handles.matrixAutoUpdate=false;handles.matrix.copy(parent.matrixWorld).multiply(featFrame(f));
   const zc=f.sym?0:f.depth/2,isC=f.profile=='circle',hw=isC?f.d/2:f.w/2,hh=isC?f.d/2:f.h/2,cu=f.u||0,cv=f.v||0;
