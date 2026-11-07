@@ -52,7 +52,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v18</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v19</small></b>
   <select id="mode" style="width:auto"><option value="bat">🏠 Bâtiment</option><option value="mec">⚙️ Pièce mécanique</option></select>
   <select id="unit" style="width:auto" title="Unités : mm, cm, m, pouces ou pieds-pouces"><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="in">pouces</option><option value="po">pieds-pouces</option></select>
   <button id="undo" title="Annuler (Ctrl+Z)">↶</button><button id="redo" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
@@ -480,7 +480,7 @@ function suggest2D(){if(!SUGG_ON||!chain||(tool!='wall'&&tool!='line')||pts.leng
   if(chain.n==2&&dist(s1.a,S0)<1){const A=s1.b,u={x:A.x-S0.x,y:A.y-S0.y},v={x:B.x-A.x,y:B.y-A.y},dot=(u.x*v.x+u.y*v.y)/((Math.hypot(u.x,u.y)*Math.hypot(v.x,v.y))||1);
     if(Math.abs(dot)<0.02){const D={x:S0.x+v.x,y:S0.y+v.y};return{pts:[B,D,S0],label:'fermer le rectangle'}}}
   return{pts:[B,S0],label:'fermer le contour'}}
-function acceptSuggest2D(){const s=suggest2D();if(!s)return false;s.pts.slice(1).forEach(q=>click({...q}));finish();chain=null;alertBox('💡 Contour fermé');return true}
+function acceptSuggest2D(){const s=suggest2D();if(!s)return false;const u0=undoS.length;s.pts.slice(1).forEach(q=>click({...q}));if(undoS.length>u0+1)undoS.splice(u0+1);finish();chain=null;alertBox('💡 Contour fermé');return true}
 addEventListener('keydown',e=>{const tg=e.target.tagName;if(tg=='INPUT'||tg=='SELECT'||tg=='TEXTAREA')return;if(e.key=='Tab'&&suggest2D()){e.preventDefault();e.stopImmediatePropagation();acceptSuggest2D()}},true);
 
 // ---------- Menu clic droit ----------
