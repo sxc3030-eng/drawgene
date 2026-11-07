@@ -52,9 +52,9 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v15</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v16</small></b>
   <select id="mode" style="width:auto"><option value="bat">🏠 Bâtiment</option><option value="mec">⚙️ Pièce mécanique</option></select>
-  <select id="unit" style="width:auto"><option value="mm">mm</option><option value="m">m</option><option value="po">pi/po</option></select>
+  <select id="unit" style="width:auto" title="Unités : mm, cm, m, pouces ou pieds-pouces"><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="in">pouces</option><option value="po">pieds-pouces</option></select>
   <button id="undo" title="Annuler (Ctrl+Z)">↶</button><button id="redo" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
   <button id="ortho" title="F8">Ortho</button><button id="snapB" class="on" title="F9">Aimant</button>
   <button id="fit">Ajuster</button><a href="modele3d.html"><button>🧊 3D</button></a>
@@ -74,6 +74,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
   </div>
 </div>
 <div id="status"><span id="sXY"></span><span id="sInfo"></span></div>
+<script src="units.js"></script>
 <script src="lib.js"></script>
 <script src="panels.js"></script>
 <script src="cmenu.js"></script>
@@ -95,17 +96,9 @@ let view={x:0,y:0,s:.1};
 let undoS=[],redoS=[];
 
 // ---------- Unités ----------
-function fmt(mm,dec){if(mm==null||isNaN(mm))return'';const u=S.unit;
-  if(u=='m')return(mm/1000).toFixed(3)+' m';
-  if(u=='po'){let i=mm/25.4,neg=i<0;i=Math.abs(i);const ft=Math.floor(i/12);let n=Math.round((i-ft*12)*16),w=Math.floor(n/16),f=n%16,d=16;
-    while(f&&f%2==0){f/=2;d/=2}let s=(ft?ft+"' ":'')+w+(f?' '+f+'/'+d:'')+'"';if(w==12)s=(ft+1)+"' 0\"";return(neg?'-':'')+s}
-  return(S.mode=='mec'||dec?(Math.round(mm*10)/10):Math.round(mm))+' mm'}
-function fmtA(mm2){if(S.unit=='po')return(mm2/92903.04).toFixed(2)+' pi²';return S.mode=='mec'?(mm2/100).toFixed(2)+' cm²':(mm2/1e6).toFixed(2)+' m²'}
-function parseLen(s){s=String(s).trim().replace(',','.');if(!s)return NaN;
-  let m=s.match(/^(-?\d+(?:\.\d+)?)\s*'\s*(?:(\d+(?:\.\d+)?)\s*"?)?$/);if(m)return(+m[1]*12+(+m[2]||0))*25.4;
-  m=s.match(/^(-?\d+(?:\.\d+)?)\s*(mm|cm|m|po|"|in)?$/);if(!m)return NaN;const v=+m[1],u=m[2];
-  if(u=='mm')return v;if(u=='cm')return v*10;if(u=='m')return v*1000;if(u=='po'||u=='"'||u=='in')return v*25.4;
-  return S.unit=='m'?v*1000:S.unit=='po'?v*25.4:v}
+function fmt(mm,dec){return DGUnits.fmt(mm,S.unit,S.mode=='mec'||dec)}
+function fmtA(mm2){if(DGUnits.imperial(S.unit))return(mm2/92903.04).toFixed(2)+' pi²';return S.mode=='mec'?(mm2/100).toFixed(2)+' cm²':(mm2/1e6).toFixed(2)+' m²'}
+function parseLen(s){return DGUnits.parse(s,S.unit)}
 
 // ---------- Géométrie ----------
 const dist=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
@@ -395,7 +388,7 @@ function click(p){const P=pts,last=P[P.length-1];
   case'room':case'poly':if(P.length>2&&dist(W2S(P[0]),W2S(p))<12){finish();break}pts.push(p);break;
   case'dim':pts.push(p);if(pts.length==3){snap0();const d=add({type:'dim',a:{...pts[0]},b:{...pts[1]},o:{...pts[2]}});const ra=findRef(pts[0],d),rb=findRef(pts[1],d);if(ra)d.aRef=ra;if(rb)d.bRef=rb;pts=[];changed();if(ra||rb)alertBox('🔗 Cote liée à la pièce : elle suivra ses changements')}break;
   case'door':case'window':{const nw=nearestWall(p);if(!nw){alertBox('Cliquez sur un mur');break}snap0();const e=nw.e;
-    add({type:tool,p:{x:e.a.x+(e.b.x-e.a.x)*nw.t,y:e.a.y+(e.b.y-e.a.y)*nw.t},ang:Math.atan2(e.b.y-e.a.y,e.b.x-e.a.x),t:e.t,w:tool=='door'?(S.unit=='po'?812.8:810):(S.unit=='po'?914.4:900),h:tool=='door'?2032:1200,flip:false});changed();break}
+    add({type:tool,p:{x:e.a.x+(e.b.x-e.a.x)*nw.t,y:e.a.y+(e.b.y-e.a.y)*nw.t},ang:Math.atan2(e.b.y-e.a.y,e.b.x-e.a.x),t:e.t,w:tool=='door'?(DGUnits.imperial(S.unit)?812.8:810):(DGUnits.imperial(S.unit)?914.4:900),h:tool=='door'?2032:1200,flip:false});changed();break}
   case'calib':{if(!S.bg){alertBox('Chargez d\'abord une photo (📷)');break}pts.push(p);if(pts.length==2){const d=dist(pts[0],pts[1]),v=parseLen(prompt('Vraie distance entre les 2 points ('+S.unit+') :','100')||'');
     if(v>0&&d>0){const k=v/d,o=pts[0];S.bg.x=o.x+(S.bg.x-o.x)*k;S.bg.y=o.y+(S.bg.y-o.y)*k;S.bg.w*=k;saveBg();alertBox('✔ Photo à l\'échelle');fit()}pts=[]}break}
   case'rectify':{if(!S.bg){alertBox('Chargez d\'abord une photo (📷)');break}pts.push(p);if(pts.length==4){const q=pts.slice();pts=[];const a=(prompt('Dimensions réelles du rectangle cliqué « largeur,hauteur » (feuille A4 = 297,210 ou 210,297) :','297,210')||'').split(/[,x×]/).map(parseLen);
@@ -551,7 +544,7 @@ function computeBat(){const c=S.cfg,items={};const addI=(k,lb,q,u)=>{if(!q)retur
     addI('plinthe','Plinthes',Math.max(0,P-doorsW),'m');addI('gypse','Gypse 4×8 (1220×2440)',A*1.1/2.977,'feuilles');addI('peinture','Peinture (2 couches)',A*2/10,'L')});
   addI('porte','Portes',S.ents.filter(e=>e.type=='door').length,'pcs');addI('fenetre','Fenêtres',S.ents.filter(e=>e.type=='window').length,'pcs');
   ['gypse','bloc','bois_2x4','bois_2x6'].forEach(k=>items[k]&&(items[k].q=Math.ceil(items[k].q)));
-  return{items,sum:[['Longueur de murs',(wallLen).toFixed(2)+' m'],['Surface murs nette',wallArea.toFixed(2)+' m²'],['Surface habitable',floorA.toFixed(2)+' m²'+(S.unit=='po'?` (${(floorA*10.7639).toFixed(0)} pi²)`:'')]]}}
+  return{items,sum:[['Longueur de murs',(wallLen).toFixed(2)+' m'],['Surface murs nette',wallArea.toFixed(2)+' m²'],['Surface habitable',floorA.toFixed(2)+' m²'+(DGUnits.imperial(S.unit)?` (${(floorA*10.7639).toFixed(0)} pi²)`:'')]]}}
 function computeMec(){const parts=S.ents.filter(e=>isShape(e)&&e.role=='contour'),holes=S.ents.filter(e=>isShape(e)&&e.role=='trou');
   return parts.map((p,i)=>{const hs=holes.filter(h=>shapeContains(p,shapeCenter(h))),q=p.qty||1,mat=p.mat||S.cfg.metal,ep=p.ep??S.cfg.ep;
     const A=shapeArea(p)-hs.reduce((s,h)=>s+shapeArea(h),0),cut=shapePerim(p)+hs.reduce((s,h)=>s+shapePerim(h),0),V=A*ep,kg=V*1e-9*DENS[mat];
@@ -604,7 +597,7 @@ tr.cat td{background:#eef3f9;font-weight:700;color:#14315c}tr.tot td{font-weight
 @media print{.bar{display:none}body{padding:10mm}h2{break-after:avoid}table{break-inside:auto}tr{break-inside:avoid}}</style></head><body>
 <div class="bar"><b>📄 Dossier ${name}</b><span style="flex:1"></span><button onclick="print()">🖨 Imprimer / PDF</button></div>
 <div class="top"><div><h1>${name}</h1><div class="note">Plan ${S.mode=='bat'?'de bâtiment':'de pièce mécanique'} · ${d}</div></div>
-<div class="cart"><div>Projet</div><div>${name}</div><div>Date</div><div>${d}</div><div>Unités</div><div>${S.unit=='po'?'pieds / pouces':S.unit}</div><div>Logiciel</div><div>drawGene — pensé par un Tech, Eugene</div></div></div>
+<div class="cart"><div>Projet</div><div>${name}</div><div>Date</div><div>${d}</div><div>Unités</div><div>${DGUnits.LIST[S.unit]||S.unit}</div><div>Logiciel</div><div>drawGene — pensé par un Tech, Eugene</div></div></div>
 <h2>Plan</h2><img class="plan" src="${img}" alt="Plan">${body}</body></html>`}
 function openDossier(){const html=buildDossier(),u=URL.createObjectURL(new Blob([html],{type:'text/html'}));const w=window.open(u,'_blank');
   if(!w)download((S.name||'dossier').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\\/:*?"<>|]+/g,'_')+' - dossier.html',html,'text/html');alertBox('📄 Dossier complet ouvert : plan, pièces, liste d\'achat, matériaux')}
@@ -865,12 +858,13 @@ $('ortho').onclick=()=>toggle('ortho');$('snapB').onclick=()=>toggle('snap');
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#tabs button,.pane').forEach(x=>x.classList.remove('on'));b.classList.add('on');$(b.dataset.p).classList.add('on')});
 function setMode(m){S.mode=m;$('mode').value=m;buildTools();renderMat();draw()}
 $('mode').onchange=()=>{setMode($('mode').value);if(!S.ents.length)fit();save()};
-$('unit').onchange=()=>{S.unit=$('unit').value;renderProps();renderMat();renderCfg();draw();save()};
+$('unit').onchange=()=>{S.unit=$('unit').value;DGUnits.set(S.unit);renderProps();renderMat();renderCfg();draw();save()};
 addEventListener('resize',resize);
 
 // ---------- Démarrage ----------
 try{const o=JSON.parse(localStorage.getItem('planpro')||'null');if(o&&o.ents){S={...S,...o,cfg:{...S.cfg,...o.cfg},prices:{...DEF_PRICES,...o.prices}}}}catch(e){}
 if(S.bg&&S.bg.src)bgImg.src=S.bg.src;
+if(!S.ents.length||!localStorage.getItem('planpro'))S.unit=DGUnits.get()||S.unit;
 $('unit').value=S.unit;$('ortho').classList.toggle('on',S.cfg.ortho);$('snapB').classList.toggle('on',S.cfg.snap);
 fixLayers();renderTabs();const libBox=DGLib.mount(document.body,'2d',cv,insertLib,{embedded:true});
 const tb=t=>()=>document.querySelector('#tools [data-t="'+t+'"]'),tabB=t=>()=>document.querySelector('#tabs [data-p="'+t+'"]');

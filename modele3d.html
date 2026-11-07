@@ -46,8 +46,8 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v15</small></b>
-  <a href="plan.html"><button>← Plan 2D</button></a>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v16</small></b>
+  <a href="plan.html"><button>← Plan 2D</button></a><select id="unit3" style="width:auto" title="Unités des cotes"></select>
   <span id="tbCreate"></span><button id="fExt" data-add="extrude">⬆ Extrusion</button>
   <button id="fRev" data-add="revolve">🔄 Révolution</button>
   <button id="fHole" data-add="hole">🕳 Trou</button>
@@ -57,7 +57,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
   <span class="sep"></span>
   <button id="exCh">🪵 Exemple : charpente 4 murs</button><button id="houseB">🏠 Maison 3D depuis le plan</button>
   <button id="undoB" title="Annuler (Ctrl+Z)">↶</button><button id="redoB" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
-  <span id="tbEnd"></span><button id="newB">📄 Nouveau</button><button id="saveB">💾 Enregistrer</button><button id="openB">📂 Ouvrir</button><button id="impB">📥 Importer STEP / IGES / STL / OBJ</button><button id="stlB">⬇ Exporter STL (impression 3D)</button><button id="objB">⬇ Exporter OBJ</button><button id="pngB">🖼 Exporter une image PNG</button>
+  <span id="tbEnd"></span><button id="newB">📄 Nouveau</button><button id="saveB">💾 Enregistrer</button><button id="openB">📂 Ouvrir</button><button id="impB">📥 Importer STEP / IGES / STL / OBJ</button><button id="stlB">⬇ Exporter STL (impression 3D)</button><button id="objB">⬇ Exporter OBJ</button><button id="pngB">🖼 Exporter une image PNG</button><button id="dosB">📄 Dossier complet (vue + matériaux)</button>
   <button id="winB">🪟 Fenêtres…</button><button id="treeT">◧ Panneau de gauche</button><button id="propT">◨ Panneau de droite</button>
   <input type="file" id="file" accept=".drawgene,.json" hidden><input type="file" id="impF" accept=".step,.stp,.iges,.igs,.stl,.obj,.brep" multiple hidden>
 </div>
@@ -72,6 +72,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+<script src="units.js"></script>
 <script src="lib.js"></script>
 <script src="panels.js"></script>
 <script src="cmenu.js"></script>
@@ -208,10 +209,10 @@ function buildDimTags(sc,CG){const box=$('dimtags');box.innerHTML='';DTAGS=[];if
     else if(f.profile=='circle')T(P(u+f.d/2,v,z1),'Ø'+f.d,()=>f.d,x=>f.d=x);
     if(f.profile!='poly'||true)T(P(u+(f.profile=='circle'?f.d/2:f.w/2),v-(f.profile=='circle'?0:f.h/2),(z0+z1)/2),f.depth,()=>f.depth,x=>{if(f.sym)f.depth=x;else f.depth=x});
     M.feats.filter(h=>h.parent==f.id&&h.on&&h.type=='hole').forEach(h=>{const c=holeCenters(h)[0];T(P(c[0]+h.d/2,c[1],z1),'Ø'+h.d+(h.pattern!='none'?' ×'+h.n:''),()=>h.d,x=>h.d=x)})});
-  DTAGS.forEach(t=>{const el=document.createElement('div');el.className='dtag'+(t.lk?' lk':'');el.textContent=typeof t.txt=='number'?String(Math.round(t.txt*100)/100):t.txt;
+  DTAGS.forEach(t=>{const el=document.createElement('div');el.className='dtag'+(t.lk?' lk':'');el.textContent=typeof t.txt=='number'?DGUnits.fmt(t.txt,null,true):String(t.txt).replace(/^Ø([\d.]+)/,(a,v)=>'Ø'+DGUnits.fmt(+v,null,true));
     el.title=t.lk?'Pièce verrouillée':'Cliquer pour modifier la cote';t.el=el;box.append(el);if(t.lk)return;
     el.onpointerdown=e=>e.stopPropagation();
-    el.onclick=e=>{e.stopPropagation();if(el.querySelector('input'))return;const inp=document.createElement('input');inp.value=String(Math.round(t.get()*100)/100);el.textContent='';el.append(inp);inp.focus();inp.select();let done=false;
+    el.onclick=e=>{e.stopPropagation();if(el.querySelector('input'))return;const inp=document.createElement('input');inp.value=DGUnits.fmt(t.get(),null,true).replace(/ (mm|cm|m)$/,'');el.textContent='';el.append(inp);inp.focus();inp.select();let done=false;
       const ok=()=>{if(done)return;done=true;const x=Math.round(parseMM(inp.value.replace(/^ø/i,''))*10)/10;if(x>0&&Math.abs(x-t.get())>1e-6){snap();t.set(x);const c=t.f.comp&&compOf(t.f.comp);if(c&&c.stock&&c.stock.len){c.stock.len=t.f.depth;c.name=`${c.stock.type} × ${FT(t.f.depth)}`;t.f.name=`${c.stock.type} ${t.f.depth} mm`}$('info').textContent='📏 Cote modifiée : '+x+' mm';rebuild()}else rebuild()};
       inp.onkeydown=ev=>{ev.stopPropagation();if(ev.key=='Enter')ok();if(ev.key=='Escape'){done=true;rebuild()}};inp.onblur=ok}});
   placeDims()}
@@ -463,7 +464,8 @@ function ctx3(e){const r=R.domElement.getBoundingClientRect();ray.setFromCamera(
     {icon:'▦',label:'Tout sélectionner',key:'Ctrl+A',disabled:!comps().length,action:()=>{selSet=comps().filter(c=>c.parent==null||!compOf(c.parent)).map(c=>c.id);sel=selSet.length==1?'c'+selSet[0]:'multi';if(selSet.length==1)selSet=[];rebuild()}},
     {icon:'🪵',label:'Ajouter du bois',action:()=>$('woodB').click()},{icon:'📏',label:'Mesurer',action:()=>$('measB').click()},{icon:'⛶',label:'Ajuster la vue',action:fitView});
   DGMenu.show(e.clientX,e.clientY,items)}
-$('delSel').onclick=deleteSelection;
+$('delSel').onclick=deleteSelection;$('dosB').onclick=openDossier3D;
+$('unit3').innerHTML=DGUnits.options(DGUnits.get());$('unit3').onchange=()=>{DGUnits.set($('unit3').value);rebuild()};
 
 // ---------- Copier / coller (répète l'espacement) ----------
 let clip=null,lastPaste=null;
@@ -589,8 +591,7 @@ $('secR').oninput=()=>updSec();$('secA').onchange=()=>updSec();$('secF').onclick
 const LUMBER={'2x3':[38,64],'2x4':[38,89],'2x6':[38,140],'2x8':[38,184],'2x10':[38,235],'2x12':[38,286],'4x4':[89,89],'6x6':[140,140],'1x4':[19,89],'1x6':[19,140]};
 const SHEETS={'Contreplaqué 1/2"':12.7,'Contreplaqué 5/8"':15.9,'Contreplaqué 3/4"':19.1,'OSB 7/16"':11.1,'Gypse 1/2"':12.7};
 const STOCK=[2438,3048,3658,4267,4877],FT=v=>{const e=Math.round(v/25.4*8),f=Math.floor(e/96),r=(e-f*96)/8,w=Math.floor(r),fr=Math.round((r-w)*8),g=(a,b)=>b?g(b,a%b):a,gg=g(fr,8);return`${f}'`+(r?` ${w}${fr?` ${fr/gg}/${8/gg}`:''}"`:'')};
-function parseMM(s){s=String(s).trim().replace(',','.');let m=s.match(/^(\d+(?:\.\d+)?)\s*'\s*(\d+(?:\.\d+)?)?(?:\s+(\d+)\/(\d+))?/);if(m)return((+m[1])*12+(+m[2]||0)+(m[3]?m[3]/m[4]:0))*25.4;
-  m=s.match(/^(\d+(?:\.\d+)?)(?:\s+(\d+)\/(\d+))?\s*(po|"|in)$/);if(m)return(+m[1]+(m[2]?m[2]/m[3]:0))*25.4;m=s.match(/^(\d+(?:\.\d+)?)\s*(mm)?$/);return m?+m[1]:NaN}
+function parseMM(s){return DGUnits.parse(s)}
 $('woodB').onclick=()=>{sel=null;selSet=[];tc.detach();const P=$('props');showProps();
   P.innerHTML=`<h4>🪵 Ajouter du bois</h4><div class="f"><span>Type</span><select id="wT">${Object.keys(LUMBER).map(k=>`<option ${k=='2x4'?'selected':''}>${k}</option>`).join('')}${Object.keys(SHEETS).map(k=>`<option>${k}</option>`).join('')}</select></div>
   <div class="f"><span>Longueur</span><select id="wL"><option value="2353">Montant 92 5/8"</option><option value="2438">8'</option><option value="3048">10'</option><option value="3658">12'</option><option value="4267">14'</option><option value="4877">16'</option><option value="x">Autre…</option></select></div>
@@ -622,6 +623,35 @@ function cutList(){const lum={},sheets={},other=[];group.updateMatrixWorld(true)
     pcs.forEach(p=>{let b=bins.find(b=>b.left>=p+(b.cuts.length?kerf:0));if(!b){const L=STOCK.find(s=>s>=p)||STOCK[STOCK.length-1];b={len:L,left:L,cuts:[],tooLong:p>L};bins.push(b)}b.left-=p+(b.cuts.length?kerf:0);b.cuts.push(p)});
     bins.forEach(b=>{const used=b.len-b.left,L=STOCK.find(s=>s>=used)||b.len;b.left+=L-b.len;b.len=L});res[t]={bins,pieces:pcs}});
   return{res,sheets,other}}
+// ---------- Liste d'achat et dossier complet (3D) ----------
+const PERFT3={'2x3':0.6,'2x4':0.75,'2x6':1.15,'2x8':1.6,'2x10':2.3,'2x12':2.9,'4x4':2.2,'6x6':5,'1x4':0.45,'1x6':0.7},SHEETP={'Contreplaqué 1/2"':38,'Contreplaqué 5/8"':45,'Contreplaqué 3/4"':55,'OSB 7/16"':22,'Gypse 1/2"':18};
+function purchase3D(){const {res,sheets,other}=cutList(),rows=[];const add=(cat,art,q,u,pu)=>{if(q>0)rows.push({cat,art,q,u,pu,t:q*pu})};
+  Object.entries(res).forEach(([t,{bins}])=>{const cnt={};bins.forEach(b=>cnt[b.len]=(cnt[b.len]||0)+1);Object.entries(cnt).sort((a,b)=>a[0]-b[0]).forEach(([l,n])=>add('Bois de construction',`${t} de ${FT(+l)}`,n,'pcs',(PERFT3[t]||1)*Math.round(l/304.8)))});
+  Object.entries(sheets).forEach(([t,pcs])=>{const full=pcs.filter(([x,y])=>x>=1215&&y>=2430).length,need=full+Math.ceil(pcs.filter(([x,y])=>!(x>=1215&&y>=2430)).reduce((s,[x,y])=>s+x*y,0)/(1220*2440)*1.15);add('Feuilles 4\' × 8\'',t,need,'feuilles',SHEETP[t]||25)});
+  const kg={};bodies().filter(f=>f.on&&f.mat!='bois').forEach(f=>kg[f.mat]=(kg[f.mat]||0)+(f._kg||0)*(f.qty||1));Object.entries(kg).forEach(([mt,k])=>add('Métal et autres',mt+' (au poids)',+k.toFixed(2),'kg',{acier:2,inox:6,alu:5,laiton:9,cuivre:12,pvc:4,acrylique:6,beton:.1}[mt]||2));
+  return{rows,total:rows.reduce((s,r)=>s+r.t,0)}}
+const money3=v=>v.toLocaleString('fr-CA',{style:'currency',currency:'CAD'});
+function dossier3D(){const old=scene.background,hid=[tc,handles,grid,axes,mG].filter(Boolean),vis=hid.map(o=>o.visible);hid.forEach(o=>o.visible=false);scene.background=new THREE.Color(0xffffff);setView('iso');hid.forEach(o=>o.visible=false);grid.visible=false;R.render(scene,cam);const img=R.domElement.toDataURL('image/png');scene.background=old;hid.forEach((o,i)=>o.visible=vis[i]);grid.visible=true;R.render(scene,cam);
+  const e=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),name=e(M.name||'Projet 3D'),d=new Date().toLocaleDateString('fr-CA'),pl=purchase3D();
+  const grp={};comps().filter(c=>c.parent==null||!compOf(c.parent)).forEach(c=>{const fs=bodies().filter(f=>descIds(c).includes(f.comp)),k=c.name;grp[k]=grp[k]||{n:0,kg:0};grp[k].n++;grp[k].kg+=fs.reduce((s,f)=>s+(f._kg||0)*(f.qty||1),0)});
+  bodies().filter(f=>!f.comp).forEach(f=>{grp[f.name]=grp[f.name]||{n:0,kg:0};grp[f.name].n+=f.qty||1;grp[f.name].kg+=(f._kg||0)*(f.qty||1)});
+  let cat='',buy='';pl.rows.forEach(r=>{if(r.cat!=cat){cat=r.cat;buy+=`<tr class="cat"><td colspan="4">${cat}</td></tr>`}buy+=`<tr><td>${e(r.art)}</td><td class="n"><b>${r.q}</b> ${r.u}</td><td class="n">${money3(r.pu)}</td><td class="n">${money3(r.t)}</td></tr>`});
+  const tk=Object.values(grp).reduce((s,g)=>s+g.kg,0);
+  return`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${name} — dossier drawGene</title><style>
+body{font:13px/1.45 system-ui,sans-serif;color:#14243d;margin:0;padding:24px;background:#fff}h1{font-size:24px;margin:0}h2{font-size:15px;margin:22px 0 6px;color:#14315c;border-bottom:2px solid #14315c;padding-bottom:3px}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}.plan{width:100%;border:1px solid #9db3cf;margin-top:10px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}td,th{padding:5px 8px;border-bottom:1px solid #dbe4ef;text-align:left}.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.cat td{background:#eef3f9;font-weight:700;color:#14315c}tr.tot td{font-weight:700;border-top:2px solid #14315c}.note{color:#4f6380;font-size:11.5px}
+.cart{border:2px solid #14315c;display:grid;grid-template-columns:auto auto;font:12px monospace}.cart div{padding:4px 10px;border-bottom:1px solid #9db3cf}.cart div:nth-child(odd){color:#4f6380;border-right:1px solid #9db3cf;font-size:10px;text-transform:uppercase}
+.bar{position:sticky;top:0;background:#14315c;color:#fff;padding:8px 24px;margin:-24px -24px 16px;display:flex;gap:10px;align-items:center}.bar button{font:600 13px system-ui;padding:6px 14px;border:0;border-radius:6px;cursor:pointer}
+@media print{.bar{display:none}body{padding:10mm}tr{break-inside:avoid}}</style></head><body>
+<div class="bar"><b>📄 Dossier ${name}</b><span style="flex:1"></span><button onclick="print()">🖨 Imprimer / PDF</button></div>
+<div class="top"><div><h1>${name}</h1><div class="note">Modèle 3D / assemblage · ${d}</div></div><div class="cart"><div>Projet</div><div>${name}</div><div>Date</div><div>${d}</div><div>Unités</div><div>${DGUnits.LIST[DGUnits.get()]}</div><div>Logiciel</div><div>drawGene — pensé par un Tech, Eugene</div></div></div>
+<h2>Vue 3D</h2><img class="plan" src="${img}" alt="Vue 3D">
+<h2>Nomenclature</h2><table><tr><th>Pièce</th><th class="n">Quantité</th><th class="n">Masse</th></tr>${Object.entries(grp).map(([k,g])=>`<tr><td>${e(k)}</td><td class="n">${g.n}</td><td class="n">${g.kg.toFixed(2)} kg</td></tr>`).join('')}<tr class="tot"><td>Total</td><td class="n">${Object.values(grp).reduce((s,g)=>s+g.n,0)}</td><td class="n">${tk.toFixed(1)} kg</td></tr></table>
+<h2>🛒 Liste d'achat</h2><table><tr><th>Article</th><th class="n">Quantité</th><th class="n">Prix u.</th><th class="n">Total</th></tr>${buy||'<tr><td colspan="4">Aucun matériau à acheter.</td></tr>'}<tr class="tot"><td colspan="3">Total estimé (avant taxes)</td><td class="n">${money3(pl.total)}</td></tr></table>
+<p class="note">Bois optimisé sur 8' à 16' avec trait de scie de 3 mm. Feuilles : entières + morceaux regroupés (+15 %). Métal au poids.</p></body></html>`}
+function openDossier3D(){const html=dossier3D(),u=URL.createObjectURL(new Blob([html],{type:'text/html'}));const w=window.open(u,'_blank');if(!w)download((M.name||'dossier')+' - dossier.html',html,'text/html');$('info').textContent='📄 Dossier complet ouvert'}
 $('cutlB').onclick=()=>{const {res,sheets,other}=cutList(),P=$('props');showProps();sel=null;selSet=[];tc.detach();let h='<h4>📋 Liste de coupe</h4>',csv=['Type;Longueur planche;Coupes (mm);Chute (mm)'];
   if(!Object.keys(res).length&&!Object.keys(sheets).length&&!other.length){P.innerHTML=h+'<p class="note">Aucune pièce. Ajoutez du 🪵 Bois ou des extrusions rectangulaires.</p>';return}
   Object.entries(res).forEach(([t,{bins,pieces}])=>{const tot=bins.reduce((s,b)=>s+b.len,0),use=pieces.reduce((s,p)=>s+p,0),cnt={};bins.forEach(b=>cnt[b.len]=(cnt[b.len]||0)+1);
@@ -633,7 +663,8 @@ $('cutlB').onclick=()=>{const {res,sheets,other}=cutList(),P=$('props');showProp
   Object.entries(sheets).forEach(([t,pcs])=>{const a=pcs.reduce((s,[x,y])=>s+x*y,0),full=pcs.filter(([x,y])=>x>=1215&&y>=2430).length,part=pcs.length-full,need=full+Math.ceil(pcs.filter(([x,y])=>!(x>=1215&&y>=2430)).reduce((s,[x,y])=>s+x*y,0)/(1220*2440)*1.15);
     h+=`<h4>${t}</h4><table><tr><td>Feuilles 4'×8' à acheter</td><td><b>${need}</b></td></tr><tr><td>Morceaux</td><td>${full} entières + ${part} coupées</td></tr></table>`;csv.push(`${t};4x8;${pcs.length} morceaux;${need} feuilles`)});
   if(other.length){h+='<h4>Autres pièces</h4><table>'+other.map(o=>`<tr><td>${o.name} (${o.mat})</td><td>${o.dims.join(' × ')} mm ×${o.q}</td></tr>`).join('')+'</table>'}
-  h+=`<div class="bk"><button id="clCsv">⬇ CSV</button></div><p class="note">Optimisé sur les longueurs 8' à 16' avec trait de scie de 3 mm. Les pièces identiques sont regroupées.</p>`;P.innerHTML=h;
+  {const pl=purchase3D();if(pl.rows.length)h+=`<h4>🛒 Total à acheter</h4><table>${pl.rows.map(r=>`<tr><td>${r.art}</td><td>${r.q} ${r.u}</td></tr>`).join('')}<tr><td><b>Total estimé</b></td><td><b>${money3(pl.total)}</b></td></tr></table>`}
+  h+=`<div class="bk"><button id="clCsv">⬇ CSV</button><button onclick="openDossier3D()">📄 Dossier complet</button></div><p class="note">Optimisé sur les longueurs 8' à 16' avec trait de scie de 3 mm. Les pièces identiques sont regroupées.</p>`;P.innerHTML=h;
   $('clCsv').onclick=()=>download('liste-de-coupe.csv','﻿'+csv.join('\n'),'text/csv')};
 
 
@@ -691,6 +722,8 @@ const AITOOLS=[
  {name:'liste_de_coupe',label:'Liste de coupe',description:'Calcule le bois à acheter et le plan de coupe.',parameters:{type:'object',properties:{}},
   run:()=>{const {res,sheets}=cutList();const out=[];Object.entries(res).forEach(([t,{bins,pieces}])=>{const cnt={};bins.forEach(b=>cnt[b.len]=(cnt[b.len]||0)+1);out.push(`${t} : ${pieces.length} morceaux → acheter ${Object.entries(cnt).map(([l,n])=>n+' × '+FT(+l)).join(', ')}`)});
     Object.entries(sheets).forEach(([t,p])=>out.push(`${t} : ${p.length} morceau(x)`));$('cutlB').click();return out.join('\n')||'aucun bois dans le modèle'}},
+ {name:'dossier_complet',label:'Dossier complet',description:'Ouvre le dossier complet imprimable : vue 3D, nomenclature et liste d\'achat.',parameters:{type:'object',properties:{}},run:()=>{openDossier3D();return'dossier ouvert'}},
+ {name:'liste_achat',label:'Liste d\'achat',description:'Liste d\'achat du modèle : planches par longueur, feuilles 4x8, métal, prix.',parameters:{type:'object',properties:{}},run:()=>{const pl=purchase3D();return pl.rows.map(r=>r.art+' : '+r.q+' '+r.u).join('\n')+'\nTotal : '+pl.total.toFixed(0)+' $'}},
  {name:'decrire_modele',label:'Lire le modèle',description:'Donne la liste détaillée des pièces, dimensions, positions et masses.',parameters:{type:'object',properties:{}},run:()=>modelSummary()},
  {name:'annuler',label:'Annuler',description:'Annule la dernière action.',parameters:{type:'object',properties:{}},run:()=>{$('undoB').click();return'annulé'}}];
 
@@ -708,7 +741,7 @@ const aiBox=DGAssist.mount('3d',AITOOLS,modelSummary,{'Menu Créer (Extrusion, R
 const WM=DGPanels.init('3d',$('main'),view,[{id:'tree',title:'Arbre du modèle',el:$('tree'),dock:'left',w:230},{id:'props',title:'Paramètres',el:$('props'),dock:'right',w:290,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:290,weight:1},{id:'lia',title:'👩 Lia — votre assistante',el:aiBox,hideMin:true,dock:'float',x:Math.max(80,innerWidth-310-360),y:Math.max(60,innerHeight-Math.min(470,innerHeight-110)-12),w:350,h:Math.min(470,innerHeight-110)}]);
 $('exCh').onclick=()=>{if(bodies().length&&!confirm('Remplacer le modèle actuel par la charpente exemple ?'))return;fetch('exemples/charpente-4-murs.drawgene').then(r=>r.text()).then(t=>openText(t,'Charpente 4 murs.drawgene')).catch(()=>alert('Exemple indisponible hors ligne la première fois.'))};
 DGMenu.group('✏ Créer ▾','Extrusion, révolution, trou, enlèvement',['fExt','fRev','fHole','fCut'],$('tbCreate'));
-DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, importer, exporter',['newB','openB','saveB','-','impB','stlB','objB','pngB'],$('tbEnd'));
+DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, importer, exporter',['newB','openB','saveB','-','dosB','impB','stlB','objB','pngB'],$('tbEnd'));
 const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['exCh','houseB','lockAll','winB','treeT','propT'],$('tbEnd'));
 $('winB').onclick=()=>WM.menu(plusB);applyNiveau();$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('treeT').onclick=()=>WM.toggleDock('left');$('propT').onclick=()=>WM.toggleDock('right');
 resize();rebuild();fitView();
