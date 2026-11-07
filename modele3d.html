@@ -46,7 +46,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v16</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v17</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a><select id="unit3" style="width:auto" title="Unités des cotes"></select>
   <span id="tbCreate"></span><button id="fExt" data-add="extrude">⬆ Extrusion</button>
   <button id="fRev" data-add="revolve">🔄 Révolution</button>
@@ -122,6 +122,7 @@ function holeCenters(h){const c=[];const n=Math.max(1,Math.round(h.n));
   else c.push([h.u,h.v]);return c}
 function orient(g,f){if(f.plane=='XZ')g.rotateX(-Math.PI/2);else if(f.plane=='YZ')g.rotateY(Math.PI/2);g.translate(f.x||0,f.y||0,f.z||0);return g}
 function buildGeom(f){
+  if(f.type=='extrude'&&f.profile=='rect'&&hasCut(f)){return orient(cutBoxGeom(f),f)}
   if(f.type=='extrude'){const S=profileShape(f);if(!S)return null;
     M.feats.filter(h=>h.on&&h.parent==f.id).forEach(h=>{
       if(h.type=='hole')holeCenters(h).forEach(([x,y])=>{const p=new THREE.Path();p.absarc(x,y,h.d/2,0,Math.PI*2,true);S.holes.push(p)});
@@ -265,7 +266,7 @@ function compProps(P,c){const lk=isLocked(c),fs=bodies().filter(b=>descIds(c).in
   <p class="note">${fs.length} corps · ${kg.toFixed(3)} kg${c.stock?' · '+c.stock.type:''}</p>`;
   $('cN').value=c.name;$('cN').onchange=()=>{snap();c.name=$('cN').value||c.name;rebuild()};
   $('cL').onclick=()=>{snap();c.locked=!c.locked;rebuild()};if(lk)return;
-  P.querySelectorAll('[data-k]').forEach(i=>i.onchange=()=>{const v=parseFloat(i.value.replace(',','.'));if(isFinite(v)){snap();c[i.dataset.k]=v}rebuild()});
+  P.querySelectorAll('[data-k]').forEach(i=>i.onchange=()=>{const pm=i.value.match(/^(\d+(?:[.,]\d+)?)\s*\/\s*12$/);const v=pm&&/^r/.test(i.dataset.k)?Math.atan(parseFloat(pm[1].replace(',','.'))/12)/D2R:parseFloat(i.value.replace(',','.'));if(isFinite(v)){snap();c[i.dataset.k]=Math.round(v*100)/100}rebuild()});
   P.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{snap();c[b.dataset.r]=((c[b.dataset.r]||0)+90)%360;rebuild()});
   $('cS').onchange=()=>{const v=parseFloat($('cS').value.replace(',','.'));if(v>0)M.step=v;rebuild()};
   $('cG').onclick=()=>{snap();groundComp(c);rebuild()};
@@ -312,6 +313,9 @@ function renderProps(){const P=$('props'),f=fid(sel),c=selComp();
     if(f.profile=='poly')L('Points (x,y; …)','pts','area')}
   if(f.type=='cut'){L('Position U','u');L('Position V','v')}
   if(f.type=='extrude'){L('Profondeur (mm)','depth');L('Symétrique','sym','bool')}
+  if(f.type=='extrude'&&f.profile=='rect'){const g=(k,ax)=>()=>{const c=f.cut&&f.cut[k];return c?Math.round(Math.atan(c[ax]||0)/D2R*100)/100:0},s=(k,ax)=>val=>{f.cut=f.cut||{};f.cut[k]=f.cut[k]||{tx:0,ty:0,dz:0};f.cut[k][ax]=Math.tan(Math.max(-80,Math.min(80,val))*D2R)};
+    F.push({lb:'✂ Coupe début ° (largeur)',k:'_c1',kind:'cut',get:g('s','tx'),set:s('s','tx')},{lb:'✂ Coupe début ° (épaisseur)',k:'_c2',kind:'cut',get:g('s','ty'),set:s('s','ty')},
+      {lb:'✂ Coupe fin ° (largeur)',k:'_c3',kind:'cut',get:g('e','tx'),set:s('e','tx')},{lb:'✂ Coupe fin ° (épaisseur)',k:'_c4',kind:'cut',get:g('e','ty'),set:s('e','ty')})}
   if(f.type=='revolve'){L('Profil (rayon,haut; …)','pts','area');L('Angle (°)','angle')}
   if(f.type=='extrude'||f.type=='revolve'){L('Décalage X','x');L('Décalage Y','y');L('Décalage Z','z');L('Matériau','mat','sel',Object.fromEntries(Object.keys(DENS).map(k=>[k,k])));L('Quantité','qty')}
   if(f.type=='hole'){L('Diamètre (mm)','d');L('Position U','u');L('Position V','v');L('Motif','pattern','sel',{none:'Aucun',lin:'Linéaire',circ:'Circulaire'});
@@ -319,7 +323,7 @@ function renderProps(){const P=$('props'),f=fid(sel),c=selComp();
   if(f.type=='hole'||f.type=='cut')L('Dans','parent','sel',Object.fromEntries(bodies().filter(b=>b.type=='extrude').map(b=>[b.id,b.name])));
   L('Actif','on','bool');
   let h=`<h4>${ICON[f.type]} ${f.name}</h4>`;
-  F.forEach((x,i)=>{const v=f[x.k];let inp;
+  F.forEach((x,i)=>{const v=x.get?x.get():f[x.k];let inp;
     if(x.kind=='sel')inp=`<select data-i="${i}">${Object.entries(x.opts).map(([k,l])=>`<option value="${k}" ${k==v?'selected':''}>${l}</option>`).join('')}</select>`;
     else if(x.kind=='bool')inp=`<select data-i="${i}"><option value="1" ${v?'selected':''}>Oui</option><option value="0" ${v?'':'selected'}>Non</option></select>`;
     else if(x.kind=='area')inp=`<textarea data-i="${i}" rows="3">${v}</textarea>`;
@@ -329,6 +333,7 @@ function renderProps(){const P=$('props'),f=fid(sel),c=selComp();
     h+=`<h4>Propriétés de masse</h4><table><tr><td>Volume</td><td>${(f._v/1000).toFixed(2)} cm³</td></tr><tr><td>Surface</td><td>${(f._a/100).toFixed(1)} cm²</td></tr>
     <tr><td>Masse unitaire</td><td>${f._kg.toFixed(3)} kg</td></tr><tr><td>Masse × ${f.qty}</td><td>${(f._kg*f.qty).toFixed(3)} kg</td></tr>
     <tr><td>Encombrement</td><td>${s.x.toFixed(1)} × ${s.y.toFixed(1)} × ${s.z.toFixed(1)} mm</td></tr></table>`}
+  if(f.type=='extrude'&&f.profile=='rect')h+='<p class="note">✂ Coupes : 0 = équerre, 45 = onglet, ou une pente comme <b>6/12</b>. Pour ajuster automatiquement deux pièces qui se rencontrent : sélectionnez-les (Ctrl+clic), puis clic droit → <b>Couper en onglet</b> ou <b>Couper contre</b>.</p>';
   if(f.type=='hole'||f.type=='cut')h+='<p class="note">U / V = position dans l\'esquisse de l\'extrusion parente (0,0 = centre du profil rectangle/cercle).</p>';
   h+=`<div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap"><button id="dupB">Dupliquer</button><button id="delB">🗑 Supprimer</button><button id="upB">▲</button><button id="dnB">▼</button></div>`;
   if(!f.comp&&(f.type=='extrude'||f.type=='revolve'))h+=`<div class="bk"><button id="mkC">🧩 Faire un composant (déplaçable, copiable)</button></div>`;
@@ -339,6 +344,7 @@ function renderProps(){const P=$('props'),f=fid(sel),c=selComp();
   if($('mkC'))$('mkC').onclick=()=>{snap();const c={id:M.nid++,name:f.name,x:0,y:0,z:0,rx:0,ry:0,rz:0};comps().push(c);f.comp=c.id;sel='c'+c.id;rebuild()};
   P.querySelectorAll('[data-i]').forEach(el=>el.onchange=()=>{const x=F[el.dataset.i];let v=el.value;
     if(x.kind=='num'){v=parseFloat(v.replace(',','.'));if(!isFinite(v)){renderProps();return}if(['w','h','d','depth','qty','n'].includes(x.k)&&v<=0){renderProps();return}}
+    if(x.kind=='cut'){let a=String(v).trim();const pm=a.match(/^(\d+(?:[.,]\d+)?)\s*\/\s*12$/);const d=pm?Math.atan(parseFloat(pm[1].replace(',','.'))/12)/D2R:parseFloat(a.replace(',','.').replace('°',''));if(!isFinite(d)){renderProps();return}snap();x.set(d);rebuild();return}
     if(x.kind=='bool')v=v=='1';if(x.k=='parent')v=+v;snap();f[x.k]=v;rebuild()});
   $('delB').onclick=()=>deleteFeat(f);
   $('dupB').onclick=()=>{snap();const c=JSON.parse(JSON.stringify(f));c.id=M.nid++;c.name+=' (copie)';if(c.type=='extrude'||c.type=='revolve')c.x+=20;M.feats.push(c);
@@ -350,9 +356,9 @@ function massTable(){const b=bodies().filter(f=>f.on&&f._kg!=null);if(!b.length&
 // ---------- Sélection, flèches, poignées, contraintes ----------
 const ray=new THREE.Raycaster();let down=null,consPick=0,consA=null;
 const ndc=(e,r)=>({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1});
-let tcOthers=null,tcTol=10;tc.addEventListener('mouseDown',()=>{snap();const c=tc.object&&compOf(tc.object.userData.comp);if(c&&c.parent==null){tcOthers=magnetTargets([c]);tcTol=pxToWorld(tc.object.position,14)}else tcOthers=null});
+let tcOthers=null,tcTol=10;tc.addEventListener('mouseDown',()=>{snap();const c=tc.object&&compOf(tc.object.userData.comp);if(c&&c.parent==null){tcOthers=otherObbs([c]);tcTol=pxToWorld(tc.object.position,14)}else tcOthers=null});
 tc.addEventListener('objectChange',()=>{const o=tc.object,c=o&&compOf(o.userData.comp);if(!c)return;const r=v=>Math.round(v*100)/100;
-  if(tcOthers&&tc.getMode()=='translate'){const mg=magnet(boxOfRoots([c]),tcOthers,tcTol);if(mg){o.position.x+=mg.d[0];o.position.y+=mg.d[1];o.position.z+=mg.d[2]}}
+  if(tcOthers&&tc.getMode()=='translate'){c.x=o.position.x;c.y=o.position.y;c.z=o.position.z;const mg=magnet3([c],tcOthers,tcTol);if(mg){o.position.x+=mg.d[0];o.position.y+=mg.d[1];o.position.z+=mg.d[2]}}
   c.x=r(o.position.x);c.y=r(o.position.y);c.z=r(o.position.z);c.rx=r(o.rotation.x/D2R);c.ry=r(o.rotation.y/D2R);c.rz=r(o.rotation.z/D2R);$('info').textContent=`🧩 ${c.name}   X ${c.x}  Y ${c.y}  Z ${c.z}   Rot ${c.rx}° ${c.ry}° ${c.rz}°`});
 tc.addEventListener('mouseUp',()=>{down=null;setTimeout(rebuild,0)});
 let rdown=null;R.domElement.addEventListener('contextmenu',e=>{e.preventDefault();if(rdown&&Math.hypot(e.clientX-rdown.x,e.clientY-rdown.y)<6)ctx3(e);rdown=null});
@@ -381,12 +387,12 @@ R.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,b:
   if(!(sel=='multi'&&selSet.includes(hitRoot.id))&&!(selComp()&&rootOf(selComp())===hitRoot)){sel='c'+hitRoot.id;selSet=[];rebuild()}
   ctl.enabled=false;snap();const p0=hAll[0].point.clone(),vert=e.shiftKey,n=vert?cam.getWorldDirection(new THREE.Vector3()).setY(0).normalize():new THREE.Vector3(0,1,0);
   const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(n,p0),start=roots.map(x=>({c:x,x:x.x||0,y:x.y||0,z:x.z||0})),q=new THREE.Vector3(),stp=M.step||1;let moved=false;
-  const others=magnetTargets(roots),tolW=pxToWorld(p0,14);
+  const others=otherObbs(roots),tolW=pxToWorld(p0,14);
   const mv=ev=>{ray.setFromCamera(ndc(ev,r),cam);if(!ray.ray.intersectPlane(plane,q))return;const d=q.clone().sub(p0),sn=v=>Math.round(v/stp)*stp;moved=true;
     const dd=[vert?0:sn(d.x),vert?sn(d.y):0,vert?0:sn(d.z)];start.forEach(s=>{s.c.x=s.x+dd[0];s.c.y=s.y+dd[1];s.c.z=s.z+dd[2];const g=gOf(s.c.id);if(g)g.position.set(s.c.x,s.c.y,s.c.z)});
-    const mg=ev.altKey?null:magnet(boxOfRoots(roots),others,tolW);
+    const mg=ev.altKey?null:magnet3(roots,others,tolW);
     if(mg){start.forEach(s=>{s.c.x=+(s.c.x+mg.d[0]).toFixed(2);s.c.y=+(s.c.y+mg.d[1]).toFixed(2);s.c.z=+(s.c.z+mg.d[2]).toFixed(2);const g=gOf(s.c.id);if(g)g.position.set(s.c.x,s.c.y,s.c.z)})}
-    $('info').textContent=`🧩 ${roots.length>1?roots.length+' pièces':hitRoot.name}  X ${hitRoot.x}  Y ${hitRoot.y}  Z ${hitRoot.z} mm`+(mg&&mg.hit.length?`\n🧲 collé à « ${[...new Set(mg.hit)].join(' », « ')} » (Alt = sans aimant)`:'')};
+    $('info').textContent=`🧩 ${roots.length>1?roots.length+' pièces':hitRoot.name}  X ${hitRoot.x}  Y ${hitRoot.y}  Z ${hitRoot.z} mm`+(mg&&mg.hit.length?`\n🧲 ${mg.kind=='coin'?'coin collé sur':mg.kind=='sol'?'posé sur le':'face collée à'} « ${[...new Set(mg.hit)].join(' », « ')} » (Alt = sans aimant)`:'')};
   const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);ctl.enabled=true;if(moved){down=null;rebuild()}else undoS.pop()};
   addEventListener('pointermove',mv);addEventListener('pointerup',up)});
 // ---------- Aimant : les pièces s'alignent et se collent quand on les approche ----------
@@ -401,6 +407,61 @@ function magnet(mb,others,tol){if(mb.isEmpty())return null;const ax=['x','y','z'
     if(a=='y'&&Math.abs(mb.min.y)<best){bd=-mb.min.y;bn='sol'}
     if(bd!=null&&Math.abs(bd)>1e-6){d[i]=bd;hit.push(bn)}else if(bd!=null)hit.push(bn)});
   return{d,hit}}
+// ---------- Aimant 360° (boîtes orientées) : face contre face, coin contre face, bords alignés ----------
+function obbOf(root){const g=gOf(root.id);if(!g)return null;g.updateMatrixWorld(true);const inv=new THREE.Matrix4().copy(g.matrixWorld).invert(),b=new THREE.Box3();
+  g.traverse(o=>{if(o.isMesh){if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();b.union(o.geometry.boundingBox.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv,o.matrixWorld)))}});
+  if(b.isEmpty())return null;return{M:g.matrixWorld.clone(),b,name:root.name,id:root.id}}
+function obbCorners(o){const P=[];for(let i=0;i<8;i++)P.push(new THREE.Vector3(i&1?o.b.max.x:o.b.min.x,i&2?o.b.max.y:o.b.min.y,i&4?o.b.max.z:o.b.min.z).applyMatrix4(o.M));return P}
+function obbFaces(o){const F=[],c=o.b.getCenter(new THREE.Vector3()),s=o.b.getSize(new THREE.Vector3()).multiplyScalar(.5),ax=['x','y','z'],E=[new THREE.Vector3(1,0,0),new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,1)];
+  ax.forEach((a,k)=>[-1,1].forEach(sg=>{const lc=c.clone();lc[a]+=sg*s[a];const o1=(k+1)%3,o2=(k+2)%3;
+    F.push({c:lc.applyMatrix4(o.M),n:E[k].clone().multiplyScalar(sg).transformDirection(o.M),u:E[o1].clone().transformDirection(o.M),v:E[o2].clone().transformDirection(o.M),hu:s[ax[o1]],hv:s[ax[o2]]})}));return F}
+function magnet3(moving,others,tol){let best={d:tol,t:null,kind:null,name:null,fb:null};const all=[];moving.forEach(A=>{const o=obbOf(A);if(o)all.push(o)});if(!all.length)return null;
+  all.forEach(A=>{const FA=obbFaces(A),CA=obbCorners(A);others.forEach(B=>{const FB=obbFaces(B);
+    FA.forEach(fa=>FB.forEach(fb=>{if(fa.n.dot(fb.n)>-0.996)return;const s=fa.c.clone().sub(fb.c).dot(fb.n),dv=fa.c.clone().sub(fb.c),mh=Math.max(fa.hu,fa.hv);
+      if(Math.abs(dv.dot(fb.u))>fb.hu+mh+tol||Math.abs(dv.dot(fb.v))>fb.hv+mh+tol)return;if(Math.abs(s)<best.d){best={d:Math.abs(s),t:fb.n.clone().multiplyScalar(-s),kind:'face',name:B.name,fb}}}));
+    CA.forEach(p=>FB.forEach(fb=>{const dv=p.clone().sub(fb.c),s=dv.dot(fb.n);if(Math.abs(dv.dot(fb.u))>fb.hu+1||Math.abs(dv.dot(fb.v))>fb.hv+1)return;
+      if(Math.abs(s)*1.15<best.d){best={d:Math.abs(s)*1.15,t:fb.n.clone().multiplyScalar(-s),kind:'coin',name:B.name,fb}}}))})});
+  const t=best.t?best.t.clone():new THREE.Vector3(),hit=best.t?[best.name]:[];
+  if(best.kind=='face'){const fb=best.fb,P=[];all.forEach(A=>obbCorners(A).forEach(p=>P.push(p.clone().add(t))));
+    [[fb.u,fb.hu],[fb.v,fb.hv]].forEach(([ax,h])=>{const pr=P.map(p=>p.clone().sub(fb.c).dot(ax)),mn=Math.min(...pr),mx=Math.max(...pr);let bx=null;
+      [-h-mn,h-mx,-h-mx,h-mn].forEach(x=>{if(Math.abs(x)<tol&&(bx==null||Math.abs(x)<Math.abs(bx)))bx=x});if(bx!=null)t.addScaledVector(ax,bx)})}
+  let minY=1/0;all.forEach(A=>obbCorners(A).forEach(p=>minY=Math.min(minY,p.y+t.y)));let kind=best.kind;
+  if(Math.abs(minY)<tol&&Math.abs(minY)>1e-6){t.y-=minY;hit.push('sol');kind=kind||'sol'}else if(Math.abs(minY)<=1e-6&&!kind){return null}
+  if(!kind)return null;return{d:[t.x,t.y,t.z],hit,kind}}
+function otherObbs(moving){const ids=new Set(moving.map(x=>x.id));return comps().filter(c=>(c.parent==null||!compOf(c.parent))&&!ids.has(c.id)).map(obbOf).filter(Boolean)}
+// ---------- Coupes d'angle sur une planche ----------
+// f.cut={s:{tx,ty,dz},e:{tx,ty,dz}} : plan de début z=z0+dz+tx·x+ty·y, plan de fin z=z1+dz+tx·x+ty·y (repère de la pièce)
+function cutBoxGeom(f){const u=f.u||0,v=f.v||0,w=f.w/2,h=f.h/2,z0=f.sym?-f.depth/2:0,z1=z0+f.depth,s=(f.cut&&f.cut.s)||{},e=(f.cut&&f.cut.e)||{};
+  const C=[[-w,-h],[w,-h],[w,h],[-w,h]],S=C.map(([x,y])=>[u+x,v+y,z0+(s.dz||0)+(s.tx||0)*x+(s.ty||0)*y]),E=C.map(([x,y])=>[u+x,v+y,z1+(e.dz||0)+(e.tx||0)*x+(e.ty||0)*y]);
+  const T=[];const tri=(a,b,c)=>T.push(...a,...b,...c);tri(S[0],S[2],S[1]);tri(S[0],S[3],S[2]);tri(E[0],E[1],E[2]);tri(E[0],E[2],E[3]);
+  for(let i=0;i<4;i++){const j=(i+1)%4;tri(S[i],S[j],E[j]);tri(S[i],E[j],E[i])}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(T,3));g.computeVertexNormals();return g}
+const hasCut=f=>!!(f.cut&&((f.cut.s&&(f.cut.s.tx||f.cut.s.ty||f.cut.s.dz))||(f.cut.e&&(f.cut.e.tx||f.cut.e.ty||f.cut.e.dz))));
+function cutInfo(f){const w=f.w/2,h=f.h/2,z0=f.sym?-f.depth/2:0,z1=z0+f.depth,s=(f.cut&&f.cut.s)||{},e=(f.cut&&f.cut.e)||{},C=[[-w,-h],[w,-h],[w,h],[-w,h]];
+  const zs=C.map(([x,y])=>z0+(s.dz||0)+(s.tx||0)*x+(s.ty||0)*y),ze=C.map(([x,y])=>z1+(e.dz||0)+(e.tx||0)*x+(e.ty||0)*y),A=c=>Math.round(Math.atan(Math.hypot(c.tx||0,c.ty||0))/D2R*10)/10;
+  return{len:Math.max(...ze)-Math.min(...zs),a0:A(s),a1:A(e)}}
+function featWorld(f){const c=f.comp&&compOf(f.comp);const g=c?gOf(c.id):group;g.updateMatrixWorld(true);return new THREE.Matrix4().multiplyMatrices(g.matrixWorld,featFrame(f))}
+function plankAxis(f){const W=featWorld(f),z0=f.sym?-f.depth/2:0,u=f.u||0,v=f.v||0;return{W,a:new THREE.Vector3(u,v,z0).applyMatrix4(W),b:new THREE.Vector3(u,v,z0+f.depth).applyMatrix4(W),dir:new THREE.Vector3(0,0,1).transformDirection(W)}}
+// coupe l'extrémité de f la plus proche du plan (point p, normale n, en monde) pour qu'elle épouse ce plan
+function cutToPlane(f,p,n,which){const W=featWorld(f),inv=new THREE.Matrix4().copy(W).invert(),pL=p.clone().applyMatrix4(inv),nL=n.clone().transformDirection(inv);
+  if(Math.abs(nL.z)<0.05)return'plan presque parallèle à la pièce : coupe impossible';const u=f.u||0,v=f.v||0,tx=-nL.x/nL.z,ty=-nL.y/nL.z,Zc=pL.z+tx*(u-pL.x)+ty*(v-pL.y);
+  if(Math.abs(Math.atan(Math.hypot(tx,ty)))>80*D2R)return'angle de coupe trop fort (plus de 80°)';
+  const z0=f.sym?-f.depth/2:0,z1=z0+f.depth,end=which||(Math.abs(Zc-z1)<Math.abs(Zc-z0)?'e':'s');f.cut=f.cut||{};f.cut[end]={tx:+tx.toFixed(6),ty:+ty.toFixed(6),dz:+(Zc-(end=='e'?z1:z0)).toFixed(3)};
+  const ci=cutInfo(f);if(ci.len<5){delete f.cut[end];return'la coupe enlèverait toute la pièce'}return null}
+function plankOf(c){return bodies().find(f=>f.comp==c.id&&f.type=='extrude'&&f.profile=='rect')}
+// onglet : les deux pièces se rejoignent à moitié angle
+function miterPair(ca,cb){const A=plankOf(ca),B=plankOf(cb);if(!A||!B)return'il faut deux planches (extrusions rectangulaires)';const a=plankAxis(A),b=plankAxis(B);
+  const w0=a.a.clone().sub(b.a),d1=a.dir,d2=b.dir,aa=1,bb=d1.dot(d2),ee=d2.dot(w0),dd=d1.dot(w0),den=1-bb*bb;if(den<1e-4)return'pièces parallèles : pas d\'onglet possible';
+  const s=(bb*ee-dd)/den,t=(ee-bb*dd)/den,J=a.a.clone().addScaledVector(d1,s).add(b.a.clone().addScaledVector(d2,t)).multiplyScalar(.5);
+  const cA=a.a.clone().add(a.b).multiplyScalar(.5),cB=b.a.clone().add(b.b).multiplyScalar(.5),uA=d1.clone().multiplyScalar(Math.sign(cA.clone().sub(J).dot(d1))||1),uB=d2.clone().multiplyScalar(Math.sign(cB.clone().sub(J).dot(d2))||1);
+  const n=uA.clone().sub(uB).normalize();const ea=Math.abs(a.a.distanceTo(J))<Math.abs(a.b.distanceTo(J))?'s':'e',eb=Math.abs(b.a.distanceTo(J))<Math.abs(b.b.distanceTo(J))?'s':'e';
+  return cutToPlane(A,J,n,ea)||cutToPlane(B,J,n,eb)}
+// coupe A contre la face de B la plus proche de l'extrémité de A
+function buttCut(ca,cb){const A=plankOf(ca);if(!A)return'« '+ca.name+' » n\'est pas une planche';const o=obbOf(rootOf(cb)===cb?cb:cb);if(!o)return'pièce introuvable';const a=plankAxis(A),cB=o.b.getCenter(new THREE.Vector3()).applyMatrix4(o.M);
+  const endP=a.a.distanceTo(cB)<a.b.distanceTo(cB)?a.a:a.b,which=endP===a.a?'s':'e';let best=null;
+  obbFaces(o).forEach(f=>{if(Math.abs(f.n.dot(a.dir))<0.05)return;const d=Math.abs(endP.clone().sub(f.c).dot(f.n));if(!best||d<best.d)best={d,f}});if(!best)return'aucune face utilisable';
+  return cutToPlane(A,best.f.c,best.f.n,which)}
+
 function touchingCluster(root){const all=comps().filter(c=>c.parent==null||!compOf(c.parent)).map(c=>({c,b:boxOfRoots([c]).expandByScalar(1)})),out=new Set([root.id]),stack=[root.id];
   while(stack.length){const cur=all.find(x=>x.c.id==stack.pop());all.forEach(o=>{if(!out.has(o.c.id)&&!o.b.isEmpty()&&o.b.intersectsBox(cur.b)){out.add(o.c.id);stack.push(o.c.id)}})}return[...out]}
 R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down.x,e.clientY-down.y)>4)return;if(e.button==2||down.b==2){down=null;return}const r=R.domElement.getBoundingClientRect();
@@ -445,11 +506,17 @@ function deleteSelection(){if(selSet.length){deleteComps(selSet);return}const c=
 function ctx3(e){const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh&&x.object.userData.id);
   const o=h.length?h[0].object:null,f=o?fid(o.userData.id):null,C=o&&o.userData.comp?compOf(o.userData.comp):null,RT=C?rootOf(C):null,items=[];
   const hasClip=!!(clip||(()=>{try{return localStorage.getItem('drawgene-clip')}catch(x){}})());
+  if(selSet.length==2&&(!C||selSet.includes(RT.id))){const [A,B]=selSet.map(compOf),doCut=(fn,msg)=>{snap();const err=fn();if(err){undoS.pop();alert(err)}else{rebuild();$('info').textContent=msg}};
+    items.push({head:'Ajuster les angles'},{icon:'📐',label:'Couper en onglet (les deux)',action:()=>doCut(()=>miterPair(A,B),'📐 Onglet coupé — voir les angles dans la liste de coupe')},
+      {icon:'✂',label:'Couper « '+A.name+' » contre « '+B.name+' »',action:()=>doCut(()=>buttCut(A,B),'✂ « '+A.name+' » coupée contre « '+B.name+' »')},
+      {icon:'✂',label:'Couper « '+B.name+' » contre « '+A.name+' »',action:()=>doCut(()=>buttCut(B,A),'✂ « '+B.name+' » coupée contre « '+A.name+' »')},'-')}
   if(selSet.length>1&&(!C||selSet.includes(RT.id))){items.push({head:selSet.length+' composants'},{icon:'🗑',label:'Supprimer la sélection',key:'Suppr',danger:true,action:()=>deleteComps(selSet)},{icon:'🧩',label:'Fusionner en sous-assemblage',action:()=>{sel='multi';rebuild();$('mF')&&$('mF').click()}},{icon:'📋',label:'Copier',key:'Ctrl+C',action:()=>copySel(selSet)},'-')}
   else if(C){const lk=isLocked(C);items.push({head:C.name+(lk?' 🔒':'')},
       {icon:'🗑',label:'Supprimer « '+C.name+' »',key:'Suppr',danger:true,disabled:lk,action:()=>deleteComps([C.id])});
     if(RT!==C)items.push({icon:'🗑',label:'Supprimer tout « '+RT.name+' »',danger:true,disabled:isLocked(RT),action:()=>deleteComps([RT.id])});
-    items.push({icon:'📋',label:'Copier',key:'Ctrl+C',action:()=>{copySel([C.id],true);$('info').textContent='📋 Copié'}},
+    if(RT!==C)items.push({icon:'📋',label:'Copier l\'ensemble « '+RT.name+' »',action:()=>{copySel([RT.id]);$('info').textContent='📋 Ensemble copié — Ctrl+V'}});
+    {const pf=plankOf(C);if(pf&&hasCut(pf))items.push({icon:'⬜',label:'Remettre les coupes d\'équerre',disabled:lk,action:()=>{snap();delete pf.cut;rebuild()}})}
+    items.push({icon:'📋',label:RT!==C?'Copier cette pièce seule':'Copier',key:'Ctrl+C',action:()=>{copySel([C.id],true);$('info').textContent='📋 Copié'}},
       {icon:'⧉',label:'Dupliquer',key:'Ctrl+D',disabled:lk,action:()=>{copySel([C.id],true);pasteClip()}},
       {icon:'✏',label:'Modifier les cotes',action:()=>{sel=f.id;selSet=[];rebuild()}},
       {icon:'🧲',label:'Sélectionner les pièces collées',action:()=>{const ids=touchingCluster(RT);if(ids.length==1){sel='c'+ids[0];selSet=[]}else{selSet=ids;sel='multi'}rebuild();$('info').textContent='🧲 '+ids.length+' pièce(s) collée(s) sélectionnée(s) — glissez pour les déplacer ensemble'}},
@@ -596,7 +663,7 @@ $('woodB').onclick=()=>{sel=null;selSet=[];tc.detach();const P=$('props');showPr
   P.innerHTML=`<h4>🪵 Ajouter du bois</h4><div class="f"><span>Type</span><select id="wT">${Object.keys(LUMBER).map(k=>`<option ${k=='2x4'?'selected':''}>${k}</option>`).join('')}${Object.keys(SHEETS).map(k=>`<option>${k}</option>`).join('')}</select></div>
   <div class="f"><span>Longueur</span><select id="wL"><option value="2353">Montant 92 5/8"</option><option value="2438">8'</option><option value="3048">10'</option><option value="3658">12'</option><option value="4267">14'</option><option value="4877">16'</option><option value="x">Autre…</option></select></div>
   <div class="f" id="wLx" hidden style="display:none"><span>Longueur (mm ou 7' 6")</span><input id="wLv" value="2000"></div>
-  <div class="f"><span>Position</span><select id="wO"><option value="y">Debout (montant)</option><option value="x">Couché sur X (lisse)</option><option value="z">Couché sur Z</option></select></div>
+  <div class="f"><span>Position</span><select id="wO"><option value="y">Debout (montant)</option><option value="x">Couché sur X (lisse)</option><option value="z">Couché sur Z (à plat)</option><option value="xc">Sur le chant, long. X (solive, chevron)</option><option value="zc">Sur le chant, long. Z (solive, chevron)</option></select></div>
   <div class="f"><span>Quantité</span><input id="wN" value="1"></div><div class="f"><span>Espacement (mm)</span><input id="wE" value="406"></div>
   <div class="bk"><button id="wGo">＋ Ajouter</button></div>
   <p class="note">Dimensions réelles : 2x4 = 38 × 89 mm, 2x6 = 38 × 140 mm. Feuilles 4' × 8'. Avec une quantité > 1, les pièces sont posées à l'espacement choisi (406 = 16 po c/c).</p>`;
@@ -605,24 +672,24 @@ $('woodB').onclick=()=>{sel=null;selSet=[];tc.detach();const P=$('props');showPr
   $('wGo').onclick=()=>{const t=$('wT').value,o=$('wO').value,n=Math.max(1,Math.round(+$('wN').value)),sp=parseFloat($('wE').value.replace(',','.'))||406;
     let L=$('wL').value=='x'?parseMM($('wLv').value):+$('wL').value;if(!(L>0)){alert('Longueur invalide');return}addWood(t,L,o,n,sp)}};
 function addWood(t,L,o,n,sp,at){const sh=SHEETS[t];if(!sh&&!LUMBER[t])throw new Error('Type de bois inconnu : '+t);snap();
-    const tgt=at||ctl.target,base={x:Math.round(tgt.x),z:Math.round(tgt.z)};
+    const tgt=at||ctl.target,base={x:Math.round(tgt.x),z:Math.round(tgt.z)};const edge=o=='xc'||o=='zc';if(edge)o=o[0];
     for(let i=0;i<n;i++){const c={id:M.nid++,name:sh?t:`${t} × ${FT(L)}`,x:base.x+(o=='x'?0:i*sp),y:0,z:base.z+(o=='x'?i*sp:0),rx:sh?(o=='y'?0:-90):(o=='y'?-90:0),ry:o=='x'?90:0,rz:0,stock:{type:t,len:sh?null:Math.round(L)}};comps().push(c);
       const f=sh?{type:'extrude',name:t,plane:'XY',profile:'rect',w:1220,h:2440,d:10,r:0,pts:'',u:0,v:1220,depth:sh,sym:false,x:0,y:0,z:0,mat:'bois',qty:1,on:true}
-        :{type:'extrude',name:`${t} ${Math.round(L)} mm`,plane:'XY',profile:'rect',w:o=='y'?LUMBER[t][0]:LUMBER[t][1],h:o=='y'?LUMBER[t][1]:LUMBER[t][0],d:10,r:0,pts:'',u:0,v:0,depth:Math.round(L),sym:false,x:0,y:0,z:0,mat:'bois',qty:1,on:true};
+        :{type:'extrude',name:`${t} ${Math.round(L)} mm`,plane:'XY',profile:'rect',w:(o=='y'||edge)?LUMBER[t][0]:LUMBER[t][1],h:(o=='y'||edge)?LUMBER[t][1]:LUMBER[t][0],d:10,r:0,pts:'',u:0,v:0,depth:Math.round(L),sym:false,x:0,y:0,z:0,mat:'bois',qty:1,on:true};
       f.id=M.nid++;f.comp=c.id;M.feats.push(f);groundLater.push(c.id)}
     rebuild();groundLater.forEach(id=>{const c=compOf(id);if(c)groundComp(c)});groundLater=[];sel=null;rebuild();if(bodies().length<=n)fitView();$('info').textContent=`🪵 ${n} × ${t} ajouté(s)`}
 let groundLater=[];
 function showProps(){const p=WM.panels.props;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout()}}
 // ---------- Liste de coupe automatique ----------
 function cutList(){const lum={},sheets={},other=[];group.updateMatrixWorld(true);
-  bodies().filter(f=>f.on&&f.type=='extrude'&&f.profile=='rect').forEach(f=>{const dims=[f.w,f.h,f.depth].map(v=>Math.round(v*10)/10).sort((a,b)=>a-b),q=f.qty||1;
+  const ANG={};bodies().filter(f=>f.on&&f.type=='extrude'&&f.profile=='rect').forEach(f=>{const ci=hasCut(f)?cutInfo(f):null,dims=[f.w,f.h,ci?Math.round(ci.len):f.depth].map(v=>Math.round(v*10)/10).sort((a,b)=>a-b),q=f.qty||1;if(ci)ANG[dims[2]]=(ANG[dims[2]]||new Set()).add((ci.a0?ci.a0+'°':'équerre')+' / '+(ci.a1?ci.a1+'°':'équerre'));
     const lt=Object.entries(LUMBER).find(([k,[a,b]])=>Math.abs(dims[0]-a)<1.5&&Math.abs(dims[1]-b)<1.5);
     const st=Object.entries(SHEETS).find(([k,t])=>Math.abs(dims[0]-t)<.6&&dims[1]>=300);
     if(lt){(lum[lt[0]]=lum[lt[0]]||[]).push(...Array(q).fill(dims[2]))}else if(st){(sheets[st[0]]=sheets[st[0]]||[]).push(...Array(q).fill([dims[1],dims[2]]))}else other.push({name:f.name,dims,q,mat:f.mat})});
   const kerf=3,res={};Object.entries(lum).forEach(([t,pcs])=>{pcs.sort((a,b)=>b-a);const bins=[];
     pcs.forEach(p=>{let b=bins.find(b=>b.left>=p+(b.cuts.length?kerf:0));if(!b){const L=STOCK.find(s=>s>=p)||STOCK[STOCK.length-1];b={len:L,left:L,cuts:[],tooLong:p>L};bins.push(b)}b.left-=p+(b.cuts.length?kerf:0);b.cuts.push(p)});
     bins.forEach(b=>{const used=b.len-b.left,L=STOCK.find(s=>s>=used)||b.len;b.left+=L-b.len;b.len=L});res[t]={bins,pieces:pcs}});
-  return{res,sheets,other}}
+  return{res,sheets,other,ANG}}
 // ---------- Liste d'achat et dossier complet (3D) ----------
 const PERFT3={'2x3':0.6,'2x4':0.75,'2x6':1.15,'2x8':1.6,'2x10':2.3,'2x12':2.9,'4x4':2.2,'6x6':5,'1x4':0.45,'1x6':0.7},SHEETP={'Contreplaqué 1/2"':38,'Contreplaqué 5/8"':45,'Contreplaqué 3/4"':55,'OSB 7/16"':22,'Gypse 1/2"':18};
 function purchase3D(){const {res,sheets,other}=cutList(),rows=[];const add=(cat,art,q,u,pu)=>{if(q>0)rows.push({cat,art,q,u,pu,t:q*pu})};
@@ -652,12 +719,12 @@ tr.cat td{background:#eef3f9;font-weight:700;color:#14315c}tr.tot td{font-weight
 <h2>🛒 Liste d'achat</h2><table><tr><th>Article</th><th class="n">Quantité</th><th class="n">Prix u.</th><th class="n">Total</th></tr>${buy||'<tr><td colspan="4">Aucun matériau à acheter.</td></tr>'}<tr class="tot"><td colspan="3">Total estimé (avant taxes)</td><td class="n">${money3(pl.total)}</td></tr></table>
 <p class="note">Bois optimisé sur 8' à 16' avec trait de scie de 3 mm. Feuilles : entières + morceaux regroupés (+15 %). Métal au poids.</p></body></html>`}
 function openDossier3D(){const html=dossier3D(),u=URL.createObjectURL(new Blob([html],{type:'text/html'}));const w=window.open(u,'_blank');if(!w)download((M.name||'dossier')+' - dossier.html',html,'text/html');$('info').textContent='📄 Dossier complet ouvert'}
-$('cutlB').onclick=()=>{const {res,sheets,other}=cutList(),P=$('props');showProps();sel=null;selSet=[];tc.detach();let h='<h4>📋 Liste de coupe</h4>',csv=['Type;Longueur planche;Coupes (mm);Chute (mm)'];
+$('cutlB').onclick=()=>{const {res,sheets,other,ANG}=cutList(),P=$('props');showProps();sel=null;selSet=[];tc.detach();let h='<h4>📋 Liste de coupe</h4>',csv=['Type;Longueur planche;Coupes (mm);Chute (mm)'];
   if(!Object.keys(res).length&&!Object.keys(sheets).length&&!other.length){P.innerHTML=h+'<p class="note">Aucune pièce. Ajoutez du 🪵 Bois ou des extrusions rectangulaires.</p>';return}
   Object.entries(res).forEach(([t,{bins,pieces}])=>{const tot=bins.reduce((s,b)=>s+b.len,0),use=pieces.reduce((s,p)=>s+p,0),cnt={};bins.forEach(b=>cnt[b.len]=(cnt[b.len]||0)+1);
     const grp={};pieces.forEach(p=>grp[p]=(grp[p]||0)+1);
     h+=`<h4>${t} — ${pieces.length} morceau(x)</h4><table>${Object.entries(cnt).sort((a,b)=>a[0]-b[0]).map(([l,n])=>`<tr><td>À acheter : ${t} ${FT(+l)}</td><td><b>${n}</b></td></tr>`).join('')}
-    <tr><td>Perte</td><td>${(100-use/tot*100).toFixed(1)} %</td></tr></table><p class="note">Coupes : ${Object.entries(grp).sort((a,b)=>b[0]-a[0]).map(([l,n])=>`${n} × ${l} mm (${FT(+l)})`).join(' · ')}</p>
+    <tr><td>Perte</td><td>${(100-use/tot*100).toFixed(1)} %</td></tr></table><p class="note">Coupes : ${Object.entries(grp).sort((a,b)=>b[0]-a[0]).map(([l,n])=>`${n} × ${l} mm (${FT(+l)})${ANG&&ANG[+l]?' — coupe '+[...ANG[+l]].join(', '):''}`).join(' · ')}</p>
     <details><summary class="note" style="cursor:pointer">Plan de coupe planche par planche</summary><table>${bins.map((b,i)=>`<tr><td>#${i+1} ${FT(b.len)}${b.tooLong?' ⚠ trop long':''}</td><td>${b.cuts.join(' + ')} · chute ${Math.round(b.left)}</td></tr>`).join('')}</table></details>`;
     bins.forEach(b=>csv.push(`${t};${b.len};${b.cuts.join(' + ')};${Math.round(b.left)}`))});
   Object.entries(sheets).forEach(([t,pcs])=>{const a=pcs.reduce((s,[x,y])=>s+x*y,0),full=pcs.filter(([x,y])=>x>=1215&&y>=2430).length,part=pcs.length-full,need=full+Math.ceil(pcs.filter(([x,y])=>!(x>=1215&&y>=2430)).reduce((s,[x,y])=>s+x*y,0)/(1220*2440)*1.15);
@@ -705,8 +772,8 @@ function modelSummary(){const L=[];L.push(`Pièces : ${comps().length} composant
   bodies().filter(f=>!f.comp).forEach(f=>L.push(`- fonction « ${f.name} » (${f.type})`));const sc=selComp();if(sc)L.push('Sélection : '+sc.name);return L.join('\n')}
 const byName=n=>{n=String(n||'').toLowerCase();return comps().filter(c=>c.name.toLowerCase().includes(n))};
 const AITOOLS=[
- {name:'ajouter_bois',label:'Ajouter du bois',description:'Ajoute des pièces de bois de construction (montants, lisses, solives, feuilles).',parameters:{type:'object',properties:{type:{type:'string',enum:[...Object.keys(LUMBER),...Object.keys(SHEETS)],description:'ex. 2x4, 2x6, Contreplaqué 5/8"'},longueur_mm:{type:'number',description:'longueur en mm (montant standard 2353, 8 pi = 2438)'},quantite:{type:'integer'},espacement_mm:{type:'number',description:'406 = 16 po c/c'},position:{type:'string',enum:['debout','couche_x','couche_z']}},required:['type']},
-  run:a=>{const n=Math.max(1,Math.round(a.quantite||1));addWood(a.type,a.longueur_mm||2353,{debout:'y',couche_x:'x',couche_z:'z'}[a.position]||'y',n,a.espacement_mm||406);return n+' × '+a.type+' ajouté(s)'}},
+ {name:'ajouter_bois',label:'Ajouter du bois',description:'Ajoute des pièces de bois de construction (montants, lisses, solives, feuilles).',parameters:{type:'object',properties:{type:{type:'string',enum:[...Object.keys(LUMBER),...Object.keys(SHEETS)],description:'ex. 2x4, 2x6, Contreplaqué 5/8"'},longueur_mm:{type:'number',description:'longueur en mm (montant standard 2353, 8 pi = 2438)'},quantite:{type:'integer'},espacement_mm:{type:'number',description:'406 = 16 po c/c'},position:{type:'string',enum:['debout','couche_x','couche_z','chant_x','chant_z']}},required:['type']},
+  run:a=>{const n=Math.max(1,Math.round(a.quantite||1));addWood(a.type,a.longueur_mm||2353,{debout:'y',couche_x:'x',couche_z:'z',chant_x:'xc',chant_z:'zc'}[a.position]||'y',n,a.espacement_mm||406);return n+' × '+a.type+' ajouté(s)'}},
  {name:'creer_plaque',label:'Créer une plaque',description:'Crée une plaque rectangulaire posée à plat, avec des trous optionnels.',parameters:{type:'object',properties:{longueur_mm:{type:'number'},largeur_mm:{type:'number'},epaisseur_mm:{type:'number'},materiau:{type:'string',enum:Object.keys(DENS)},trous:{type:'array',description:'trous traversants, position depuis le centre',items:{type:'object',properties:{x_mm:{type:'number'},y_mm:{type:'number'},diametre_mm:{type:'number'}}}},nom:{type:'string'}},required:['longueur_mm','largeur_mm','epaisseur_mm']},
   run:a=>{snap();const c={id:M.nid++,name:a.nom||'Plaque',x:Math.round(ctl.target.x),y:0,z:Math.round(ctl.target.z),rx:0,ry:0,rz:0};comps().push(c);
     const f={id:M.nid++,type:'extrude',name:c.name,plane:'XZ',profile:'rect',w:a.longueur_mm,h:a.largeur_mm,d:10,r:0,pts:'',u:0,v:0,depth:a.epaisseur_mm,sym:false,x:0,y:0,z:0,mat:a.materiau||'acier',qty:1,on:true,comp:c.id};M.feats.push(f);
