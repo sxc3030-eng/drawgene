@@ -19,7 +19,7 @@ const css=`.dgdock{display:flex;flex-direction:column;flex:none;position:relativ
 .dgmenu{position:fixed;z-index:70;background:#22252c;border:1px solid #3d8bff;border-radius:8px;padding:6px;box-shadow:0 8px 24px #000a;font:13px system-ui;color:#e6e7ea;min-width:200px}
 .dgmenu label{display:flex;gap:8px;align-items:center;padding:5px 6px;border-radius:5px;cursor:pointer}.dgmenu label:hover{background:#2f333c}
 .dgmenu button{width:100%;margin-top:6px;background:#2f333c;border:1px solid #363a44;color:#e6e7ea;border-radius:6px;padding:5px;cursor:pointer}
-@media(max-width:760px){.dgdock{position:absolute!important;top:0;bottom:0;z-index:20;transition:transform .2s;width:85%!important}.dgdock.left{left:0;transform:translateX(-102%)}.dgdock.right{right:0;transform:translateX(102%)}.dgdock.open{transform:none}}`;
+@media(max-width:760px){.dgdock.left,.dgdock.right{max-width:100vw}#main{position:relative;overflow:hidden}.dgp.float{max-width:calc(100vw - 12px)}.dgdock{position:absolute!important;top:0;bottom:0;z-index:20;transition:transform .2s;width:85%!important}.dgdock.left{left:0;transform:translateX(-102%)}.dgdock.right{right:0;transform:translateX(102%)}.dgdock.open{transform:none}}`;
 const DGPanels={
   init(app,main,center,defs){
     if(!document.getElementById('dgpcss')){const s=document.createElement('style');s.id='dgpcss';s.textContent=css;document.head.append(s)}
@@ -64,7 +64,7 @@ const DGPanels={
         sp.onpointerdown=e=>{e.preventDefault();const sx=e.clientX,w0=dockW[side];const mv=ev=>{const dx=ev.clientX-sx;dockW[side]=Math.max(56,Math.min(innerWidth*.6,w0+(side=='left'?dx:-dx)));d.style.width=dockW[side]+'px';d.querySelectorAll('.dgp').forEach(x=>x.classList.toggle('narrow',dockW[side]<130));fire()};
           const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);save();fire()};addEventListener('pointermove',mv);addEventListener('pointerup',up)}});
       Object.values(P).filter(p=>p.mode=='float'&&!p.hidden).forEach(p=>{const w=p.win;w.className='dgp float'+(p.min?' min':'')+(p.w<130?' narrow':'');
-        if(!p.min){p.h=Math.min(p.h,innerHeight-60);p.y=Math.min(p.y,innerHeight-p.h-6)}w.style.cssText=`left:${Math.min(Math.max(0,p.x),innerWidth-80)}px;top:${Math.min(Math.max(0,p.y),innerHeight-40)}px;width:${p.w}px;${p.min?'':'height:'+p.h+'px;'}z-index:${++z}`;if(w.parentNode!==document.body)document.body.append(w)});
+        if(!p.min){p.h=Math.min(p.h,innerHeight-60);p.y=Math.min(p.y,innerHeight-p.h-6)}const fw=Math.min(p.w,innerWidth-12);if(p.x+fw>innerWidth-6)p.x=Math.max(6,innerWidth-fw-6);w.style.cssText=`left:${Math.min(Math.max(0,p.x),innerWidth-80)}px;top:${Math.min(Math.max(0,p.y),innerHeight-40)}px;width:${Math.min(p.w,innerWidth-12)}px;${p.min?'':'height:'+p.h+'px;'}z-index:${++z}`;if(w.parentNode!==document.body)document.body.append(w)});
       Object.values(P).filter(p=>p.hidden).forEach(p=>{p.win.className='dgp';p.win.style.cssText='display:none';if(p.win.parentNode!==document.body)document.body.append(p.win)});save();fire()}
     layout();
     const api={layout,
