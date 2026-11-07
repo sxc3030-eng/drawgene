@@ -41,6 +41,7 @@ h4{font-size:11px;text-transform:uppercase;color:var(--mut);margin:12px 0 6px}
 table{width:100%;border-collapse:collapse;font-size:12px}
 td,th{padding:4px 3px;border-bottom:1px solid var(--line);text-align:left}
 td.n,th.n{text-align:right}
+table.buy tr.cat td{color:var(--acc);font-weight:700;font-size:11px;text-transform:uppercase;padding-top:8px}table.buy tr.tot td{font-weight:700}
 td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1px solid var(--line);border-radius:4px}
 .tot{font-size:15px;font-weight:600;margin-top:8px;text-align:right}
 .note{color:var(--mut);font-size:11px;margin-top:6px;line-height:1.4}
@@ -51,14 +52,14 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v14</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v15</small></b>
   <select id="mode" style="width:auto"><option value="bat">🏠 Bâtiment</option><option value="mec">⚙️ Pièce mécanique</option></select>
   <select id="unit" style="width:auto"><option value="mm">mm</option><option value="m">m</option><option value="po">pi/po</option></select>
   <button id="undo" title="Annuler (Ctrl+Z)">↶</button><button id="redo" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
   <button id="ortho" title="F8">Ortho</button><button id="snapB" class="on" title="F9">Aimant</button>
   <button id="fit">Ajuster</button><a href="modele3d.html"><button>🧊 3D</button></a>
   <span id="tbEnd"></span><button id="newB">📄 Nouveau</button><button id="saveB">💾 Enregistrer</button><button id="openB">📂 Ouvrir</button>
-  <button id="photoB">📷 Photo de référence</button><button id="to3dB">⬆ Envoyer la pièce en 3D</button><button id="pngB">🖼 Exporter une image PNG</button><button id="dxfB">⬇ Exporter en DXF (AutoCAD)</button><button id="dxfI">⬆ Importer un DXF</button><button id="csvB">📊 Liste de matériaux (CSV)</button><button id="printB">🖨 Imprimer</button>
+  <button id="photoB">📷 Photo de référence</button><button id="to3dB">⬆ Envoyer la pièce en 3D</button><button id="pngB">🖼 Exporter une image PNG</button><button id="dxfB">⬇ Exporter en DXF (AutoCAD)</button><button id="dxfI">⬆ Importer un DXF</button><button id="csvB">📊 Liste de matériaux (CSV)</button><button id="printB">🖨 Imprimer</button><button id="dosB">📄 Dossier complet (plans + matériaux)</button>
   <button id="winB">🪟 Fenêtres…</button><button id="panelB">◨ Panneau de droite</button>
   <input type="file" id="file" accept=".drawgene,.json,application/json" hidden><input type="file" id="photoF" accept="image/*" hidden><input type="file" id="dxfF" accept=".dxf" hidden>
 </div>
@@ -556,9 +557,60 @@ function computeMec(){const parts=S.ents.filter(e=>isShape(e)&&e.role=='contour'
     const A=shapeArea(p)-hs.reduce((s,h)=>s+shapeArea(h),0),cut=shapePerim(p)+hs.reduce((s,h)=>s+shapePerim(h),0),V=A*ep,kg=V*1e-9*DENS[mat];
     const cost=kg*q*(S.kgprice[mat]||0)+cut/1000*q*(S.prices.coupe||0);
     return{name:p.name||'Pièce '+(i+1),id:p.id,mat,ep,q,A,cut,V,kg,holes:hs.length,cost,dia:hs.filter(h=>h.type=='circle').map(h=>h.r*2)}})}
+// ---------- Liste d'achat (cour à bois) ----------
+const STK=[2438,3048,3658,4267,4877];
+function ftIn(mm){const e=Math.round(mm/25.4*8),f=Math.floor(e/96),r=(e-f*96)/8,w=Math.floor(r),fr=Math.round((r-w)*8),g=(a,b)=>b?g(b,a%b):a;return f+"'"+(r?' '+w+(fr?' '+fr/g(fr,8)+'/'+8/g(fr,8):'')+'"':'')}
+function packBoards(pieces){const P=pieces.flatMap(p=>{const o=[];while(p>4877){o.push(4877);p-=4877}if(p>0)o.push(p);return o}).sort((a,b)=>b-a),bins=[];
+  P.forEach(p=>{let b=bins.find(b=>b.left>=p+3);if(!b){const L=STK.find(s=>s>=p)||4877;b={len:L,left:L,cuts:[]};bins.push(b)}b.left-=p+3;b.cuts.push(Math.round(p))});
+  bins.forEach(b=>{const used=b.len-b.left-3;b.len=STK.find(s=>s>=used)||b.len});const cnt={};bins.forEach(b=>cnt[b.len]=(cnt[b.len]||0)+1);return{cnt,bins}}
+const PERFT={'2x4':0.75,'2x6':1.15,'2x8':1.6,'2x10':2.3};
+function purchaseList(){const sp=S.cfg.stud||406,walls=S.ents.filter(e=>e.type=='wall'&&(e.mat||'ossature')=='ossature'),studs={},plates={},heads=[],rows=[];let shA=0,gyA=0,insA=0,insIntA=0;
+  walls.forEach(w=>{const sz=w.t<=110?'2x4':'2x6',L=dist(w.a,w.b),H=w.h||2440,ops=openingsOf(w),ext=w.t>110;
+    let n=Math.floor(L/sp)+1;ops.forEach(o=>{n+=3-Math.floor(o.w/sp);if(o.type=='window')n+=Math.ceil((Math.ceil(o.w/sp)+1)/2);heads.push(o.w+76,o.w+76)});
+    [w.a,w.b].forEach(pt=>{if(walls.some(o=>o!==w&&segDist(pt,o.a,o.b).d<o.t))n+=1});
+    const sl=H-3*38,lab=sl<=2360?'précoupé 92 5/8" (mur de 8\')':ftIn(STK.find(s=>s>=sl)||4877);studs[sz+'|'+lab]=(studs[sz+'|'+lab]||{n:0,len:sl<=2360?2353:STK.find(s=>s>=sl)||4877});studs[sz+'|'+lab].n+=n;
+    (plates[sz]=plates[sz]||[]).push(L,L,L);const opA=ops.reduce((s,o)=>s+o.w*o.h,0),net=Math.max(0,L*H-opA);
+    if(ext){shA+=L*H;insA+=net;gyA+=net}else{gyA+=2*net;insIntA+=net}});
+  S.ents.filter(e=>e.type=='room').forEach(r=>gyA+=polyArea(r.pts));
+  const add=(cat,art,q,u,pu)=>{if(q>0)rows.push({cat,art,q,u,pu,t:q*pu})};
+  Object.entries(studs).sort().forEach(([k,v])=>{const [sz,lab]=k.split('|');add('Montants',`${sz} ${lab}`,v.n,'pcs',(PERFT[sz]||1)*Math.round(v.len/304.8))});
+  Object.entries(plates).forEach(([sz,P])=>{const {cnt}=packBoards(P);Object.entries(cnt).sort((a,b)=>a[0]-b[0]).forEach(([l,n])=>add('Lisses et sablières (1 basse + 2 hautes)',`${sz} de ${ftIn(+l)}`,n,'pcs',(PERFT[sz]||1)*Math.round(l/304.8)))});
+  if(heads.length){const {cnt}=packBoards(heads);Object.entries(cnt).sort((a,b)=>a[0]-b[0]).forEach(([l,n])=>add('Linteaux (doublés)',`2x10 de ${ftIn(+l)}`,n,'pcs',PERFT['2x10']*Math.round(l/304.8)))}
+  const sheet=1219.2*2438.4;
+  add('Feuilles 4\' × 8\'','OSB 7/16" — revêtement extérieur',Math.ceil(shA/sheet*1.05),'feuilles',S.prices.osb??22);
+  add('Feuilles 4\' × 8\'','Gypse 1/2" — murs intérieurs et plafonds',Math.ceil(gyA/sheet*1.10),'feuilles',S.prices.gypse??18);
+  add('Isolation','Laine R-24 (murs extérieurs 2x6)',Math.ceil(insA/92903),'pi²',S.prices.isol_pi2??0.9);
+  if(insIntA)add('Isolation','Laine acoustique (murs intérieurs, optionnel)',Math.ceil(insIntA/92903),'pi²',0.75);
+  add('Ouvertures','Portes',S.ents.filter(e=>e.type=='door').length,'pcs',S.prices.porte??250);add('Ouvertures','Fenêtres',S.ents.filter(e=>e.type=='window').length,'pcs',S.prices.fenetre??450);
+  return{rows,total:rows.reduce((s,r)=>s+r.t,0)}}
+function purchaseHTML(pl,cls){let h='',cat='';pl.rows.forEach(r=>{if(r.cat!=cat){cat=r.cat;h+=`<tr class="cat"><td colspan="4">${cat}</td></tr>`}h+=`<tr><td>${r.art}</td><td class="n"><b>${r.q}</b> ${r.u}</td><td class="n">${money(r.pu)}</td><td class="n">${money(r.t)}</td></tr>`});
+  return`<table class="${cls||''}"><tr><th>Article</th><th class="n">Quantité</th><th class="n">Prix u.</th><th class="n">Total</th></tr>${h}<tr class="tot"><td colspan="3">Total estimé (avant taxes)</td><td class="n">${money(pl.total)}</td></tr></table>`}
+// ---------- Dossier complet : plan + pièces + liste d'achat + matériaux ----------
+function buildDossier(){const v={...view},r=cv.getBoundingClientRect();fit();printing=true;draw();const img=cv.toDataURL('image/png');printing=false;view.x=v.x;view.y=v.y;view.s=v.s;draw();
+  const esc2=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));const name=esc2(S.name||'Projet sans nom'),d=new Date().toLocaleDateString('fr-CA');
+  let body='';
+  if(S.mode=='bat'){const rooms=S.ents.filter(e=>e.type=='room'),pl=purchaseList(),{items,sum}=computeBat();let tA=0;
+    body+=`<h2>Pièces</h2><table><tr><th>Pièce</th><th class="n">Surface</th><th class="n">m²</th><th>Revêtement</th></tr>${rooms.map(x=>{const a=polyArea(x.pts);tA+=a;return`<tr><td>${esc2(x.name)}</td><td class="n">${(a/92903).toFixed(0)} pi²</td><td class="n">${(a/1e6).toFixed(2)}</td><td>${{plancher:'Plancher',ceramique:'Céramique',beton:'Béton',aucun:'—'}[x.floor||'plancher']}</td></tr>`}).join('')}<tr class="tot"><td>Total</td><td class="n">${(tA/92903).toFixed(0)} pi²</td><td class="n">${(tA/1e6).toFixed(2)}</td><td></td></tr></table>
+    <h2>🛒 Liste d'achat — cour à bois</h2>${purchaseHTML(pl)}<p class="note">Montants aux ${Math.round(S.cfg.stud/25.4)} po c/c, +3 par ouverture (montants nains et petits bouts sous les fenêtres compris), +1 par coin ou jonction. Lisses : 1 basse + 2 hautes, optimisées sur 8' à 16'. Linteaux 2x10 doublés (largeur + 3 po). Feuilles : +5 % OSB, +10 % gypse.</p>
+    <h2>Autres matériaux (estimation)</h2><table>${sum.map(s=>`<tr><td>${s[0]}</td><td class="n">${s[1]}</td></tr>`).join('')}${Object.entries(items).filter(([k])=>!/bois_|gypse|isolant|porte|fenetre/.test(k)).map(([k,it])=>`<tr><td>${it.lb}</td><td class="n">${Number.isInteger(it.q)?it.q:it.q.toFixed(1)} ${it.u}</td></tr>`).join('')}</table>`}
+  else{const ps=computeMec();body+=`<h2>Pièces mécaniques</h2><table><tr><th>Pièce</th><th class="n">Qté</th><th>Matériau</th><th class="n">Masse</th><th class="n">Coupe</th><th class="n">Coût</th></tr>${ps.map(x=>`<tr><td>${esc2(x.name)}</td><td class="n">${x.q}</td><td>${x.mat} ${x.ep} mm</td><td class="n">${x.kg.toFixed(3)} kg</td><td class="n">${Math.round(x.cut)} mm</td><td class="n">${money(x.cost)}</td></tr>`).join('')}</table>`}
+  return`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${name} — dossier drawGene</title><style>
+body{font:13px/1.45 system-ui,sans-serif;color:#14243d;margin:0;padding:24px;background:#fff}h1{font-size:24px;margin:0}h2{font-size:15px;margin:22px 0 6px;color:#14315c;border-bottom:2px solid #14315c;padding-bottom:3px}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}.plan{width:100%;border:1px solid #9db3cf;margin-top:10px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}td,th{padding:5px 8px;border-bottom:1px solid #dbe4ef;text-align:left}.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.cat td{background:#eef3f9;font-weight:700;color:#14315c}tr.tot td{font-weight:700;border-top:2px solid #14315c}.note{color:#4f6380;font-size:11.5px}
+.cart{border:2px solid #14315c;display:grid;grid-template-columns:auto auto;font:12px monospace}.cart div{padding:4px 10px;border-bottom:1px solid #9db3cf}.cart div:nth-child(odd){color:#4f6380;border-right:1px solid #9db3cf;font-size:10px;text-transform:uppercase}
+.bar{position:sticky;top:0;background:#14315c;color:#fff;padding:8px 24px;margin:-24px -24px 16px;display:flex;gap:10px;align-items:center}.bar button{font:600 13px system-ui;padding:6px 14px;border:0;border-radius:6px;cursor:pointer}
+@media print{.bar{display:none}body{padding:10mm}h2{break-after:avoid}table{break-inside:auto}tr{break-inside:avoid}}</style></head><body>
+<div class="bar"><b>📄 Dossier ${name}</b><span style="flex:1"></span><button onclick="print()">🖨 Imprimer / PDF</button></div>
+<div class="top"><div><h1>${name}</h1><div class="note">Plan ${S.mode=='bat'?'de bâtiment':'de pièce mécanique'} · ${d}</div></div>
+<div class="cart"><div>Projet</div><div>${name}</div><div>Date</div><div>${d}</div><div>Unités</div><div>${S.unit=='po'?'pieds / pouces':S.unit}</div><div>Logiciel</div><div>drawGene — pensé par un Tech, Eugene</div></div></div>
+<h2>Plan</h2><img class="plan" src="${img}" alt="Plan">${body}</body></html>`}
+function openDossier(){const html=buildDossier(),u=URL.createObjectURL(new Blob([html],{type:'text/html'}));const w=window.open(u,'_blank');
+  if(!w)download((S.name||'dossier').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\\/:*?"<>|]+/g,'_')+' - dossier.html',html,'text/html');alertBox('📄 Dossier complet ouvert : plan, pièces, liste d\'achat, matériaux')}
 function money(v){return v.toLocaleString('fr-CA',{style:'currency',currency:'CAD'})}
 function renderMat(){const M=$('mat');let h='',rows=[];
-  if(S.mode=='bat'){const {items,sum}=computeBat();h+='<h4>Résumé</h4><table>'+sum.map(r=>`<tr><td>${r[0]}</td><td class="n">${r[1]}</td></tr>`).join('')+'</table>';
+  if(S.mode=='bat'){const pl=purchaseList();if(pl.rows.length)h+='<h4>🛒 À acheter (cour à bois)</h4>'+purchaseHTML(pl,'buy')+'<div class="bk" style="display:flex;gap:6px;margin:8px 0"><button onclick="openDossier()">📄 Dossier complet</button></div>';const {items,sum}=computeBat();h+='<h4>Résumé</h4><table>'+sum.map(r=>`<tr><td>${r[0]}</td><td class="n">${r[1]}</td></tr>`).join('')+'</table>';
     h+='<h4>Liste de matériaux</h4><table><tr><th>Article</th><th class="n">Qté</th><th class="n">Prix u.</th><th class="n">Total</th></tr>';let tot=0;
     Object.entries(items).forEach(([k,it])=>{const pr=S.prices[k]??0,t=pr*it.q;tot+=t;const q=Number.isInteger(it.q)?it.q:it.q.toFixed(2);rows.push([it.lb,q,it.u,pr,t.toFixed(2)]);
       h+=`<tr><td>${it.lb}</td><td class="n">${q} ${it.u}</td><td class="n"><input data-p="${k}" value="${pr}"></td><td class="n">${money(t)}</td></tr>`});
@@ -755,6 +807,8 @@ const AITOOLS=[
  {name:'liste_materiaux',label:'Liste de matériaux',description:'Donne la liste de matériaux, quantités et coût estimé (ou masse et coût des pièces mécaniques).',parameters:{type:'object',properties:{}},
   run:()=>{if(S.mode=='bat'){const {items,sum}=computeBat();let t=0;const L=sum.map(s=>s.join(' : '));Object.entries(items).forEach(([k,it])=>{const pr=S.prices[k]??0;t+=pr*it.q;L.push(`${it.lb} : ${Number.isInteger(it.q)?it.q:it.q.toFixed(2)} ${it.u}`)});L.push('Total estimé : '+t.toFixed(2)+' $');return L.join('\n')}
     return computeMec().map(p=>`${p.name} ×${p.q} : ${p.mat} ép. ${p.ep} mm, ${p.kg.toFixed(3)} kg, ${p.holes} trous, coupe ${Math.round(p.cut)} mm, ${p.cost.toFixed(2)} $`).join('\n')||'aucune pièce'}},
+ {name:'liste_achat',label:'Liste d\'achat',description:'Donne la liste d\'achat pour la cour à bois : combien de 2x4/2x6 de 8 pieds, lisses, linteaux, feuilles 4x8 (OSB, gypse), isolant, avec prix.',parameters:{type:'object',properties:{}},run:()=>{const pl=purchaseList();return pl.rows.map(r=>r.art+' : '+r.q+' '+r.u).join('\n')+'\nTotal : '+pl.total.toFixed(0)+' $'}},
+ {name:'dossier_complet',label:'Dossier complet',description:'Ouvre le dossier complet imprimable : plan, pièces, liste d\'achat et matériaux.',parameters:{type:'object',properties:{}},run:()=>{openDossier();return'dossier ouvert'}},
  {name:'supprimer_selection',label:'Supprimer',description:'Supprime les éléments sélectionnés.',parameters:{type:'object',properties:{}},run:()=>{const n=selEnts().length;deleteSel();return n+' supprimé(s)'}},
  {name:'decrire_dessin',label:'Lire le dessin',description:'Décrit le dessin actuel (pièces, surfaces, emprise).',parameters:{type:'object',properties:{}},run:()=>drawingSummary()},
  {name:'annuler',label:'Annuler',description:'Annule la dernière action.',parameters:{type:'object',properties:{}},run:()=>{undo();return'annulé'}}];
@@ -804,7 +858,7 @@ $('dxfF').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(txt=
   out.forEach(o=>{if(o.type=='poly'&&o.pts.length<2)return;if(!isShape(o)||o.type=='poly'&&!o.closed)o.role='trait';add(o)});
   sh.forEach(o=>o.role=defRole(shapeCenter(o)));sel=null;changed();fit();alertBox('📥 '+out.length+' entités importées')});e.target.value=''};
 
-$('delSel').onclick=deleteSel;
+$('delSel').onclick=deleteSel;$('dosB').onclick=openDossier;
 $('undo').onclick=undo;$('redo').onclick=redo;$('fit').onclick=fit;
 function toggle(k){S.cfg[k]=!S.cfg[k];$(k=='snap'?'snapB':'ortho').classList.toggle('on',S.cfg[k]);save()}
 $('ortho').onclick=()=>toggle('ortho');$('snapB').onclick=()=>toggle('snap');
@@ -824,7 +878,7 @@ const aiBox=DGAssist.mount('2d',AITOOLS,drawingSummary,{'Sélection':tb('select'
   'Menu Fichier (Nouveau, Ouvrir, Enregistrer, exporter)':'.dgmb','Annuler':'#undo','Rétablir':'#redo','Supprimer':'#delSel','Ortho':'#ortho','Aimant':'#snapB','Ajuster la vue':'#fit','Passer en 3D':'a[href="modele3d.html"] button','Mode bâtiment / pièce':'#mode','Unités':'#unit',
   'Calques':'#ltabs','Ajouter un calque':()=>[...document.querySelectorAll('#ltabs .tb')].find(x=>/Calque/.test(x.textContent)&&/＋/.test(x.textContent)),'Propriétés':tabB('props'),'Matériaux et coûts':tabB('mat'),'Réglages':tabB('cfg'),'Bibliothèque':'.dglib'});
 const WM=DGPanels.init('2d',$('main'),$('stage'),[{id:'tools',title:'Outils',el:$('tools'),dock:'left',w:64},{id:'side',title:'Propriétés',el:$('side'),dock:'right',w:300,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:300,weight:1},{id:'lia',title:'👩 Lia — votre assistante',el:aiBox,hideMin:true,dock:'float',x:Math.max(80,innerWidth-310-360),y:Math.max(60,innerHeight-Math.min(470,innerHeight-110)-12),w:350,h:Math.min(470,innerHeight-110)}]);
-DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, exporter',['newB','openB','saveB','-','photoB','pngB','dxfB','dxfI','csvB','printB'],$('tbEnd'));
+DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, exporter',['newB','openB','saveB','-','dosB','printB','pngB','dxfB','dxfI','csvB','-','photoB'],$('tbEnd'));
 const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['to3dB','winB','panelB'],$('tbEnd'));
 $('winB').onclick=()=>WM.menu(plusB);applyNiveau();$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('panelB').onclick=()=>WM.toggleDock('right');
 setMode(S.mode);renderCfg();resize();S.ents.forEach(e=>{if(e.id>=nid)nid=e.id+1});
