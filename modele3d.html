@@ -46,7 +46,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v17</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v18</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a><select id="unit3" style="width:auto" title="Unités des cotes"></select>
   <span id="tbCreate"></span><button id="fExt" data-add="extrude">⬆ Extrusion</button>
   <button id="fRev" data-add="revolve">🔄 Révolution</button>
@@ -55,7 +55,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
   <span class="sep"></span>
   <button id="woodB">🪵 Bois</button><button id="consB">🔗 Contrainte</button><button id="cutlB">📋 Liste de coupe</button><button id="lockAll">🔓 Assemblage</button>
   <span class="sep"></span>
-  <button id="exCh">🪵 Exemple : charpente 4 murs</button><button id="houseB">🏠 Maison 3D depuis le plan</button>
+  <button id="sugB">💡 Suggestions de la suite (activer / désactiver)</button><button id="exCh">🪵 Exemple : charpente 4 murs</button><button id="houseB">🏠 Maison 3D depuis le plan</button>
   <button id="undoB" title="Annuler (Ctrl+Z)">↶</button><button id="redoB" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
   <span id="tbEnd"></span><button id="newB">📄 Nouveau</button><button id="saveB">💾 Enregistrer</button><button id="openB">📂 Ouvrir</button><button id="impB">📥 Importer STEP / IGES / STL / OBJ</button><button id="stlB">⬇ Exporter STL (impression 3D)</button><button id="objB">⬇ Exporter OBJ</button><button id="pngB">🖼 Exporter une image PNG</button><button id="dosB">📄 Dossier complet (vue + matériaux)</button>
   <button id="winB">🪟 Fenêtres…</button><button id="treeT">◧ Panneau de gauche</button><button id="propT">◨ Panneau de droite</button>
@@ -194,7 +194,7 @@ function rebuild(){solveCons();group.clear();if(handles){scene.remove(handles);h
   const rc=sc?rootOf(sc):null;if(rc&&!isLocked(rc)&&CG[sc.id]&&!measuring&&!consPick){tc.attach(CG[sc.id]);if(!tc.parent)scene.add(tc);tc.setTranslationSnap(M.step||1)}else{tc.detach();if(tc.parent)scene.remove(tc)}
   // poignées d'étirement sur la fonction sélectionnée
   const sf=fid(sel);if(sf&&sf.type=='extrude'&&sf.on&&(sf.profile=='rect'||sf.profile=='circle')&&!(sf.comp&&isLocked(compOf(sf.comp)))&&!measuring)buildHandles(sf,sf.comp&&CG[sf.comp]?CG[sf.comp]:group);
-  buildDimTags(sc,CG);
+  buildDimTags(sc,CG);try{updateSuggest()}catch(e){}
   $('info').textContent=`Corps: ${tot.n}   Volume: ${(tot.vol/1000).toFixed(1)} cm³   Masse: ${tot.kg.toFixed(3)} kg`+(M.locked?'   🔒 Assemblage verrouillé':'')+(info.length?'\n⚠ '+info.join('\n⚠ '):'');
   $('lockAll').textContent=(M.locked?'🔒':'🔓')+' Assemblage';$('lockAll').classList.toggle('on',!!M.locked);
   renderTree();renderProps();save()}
@@ -217,7 +217,7 @@ function buildDimTags(sc,CG){const box=$('dimtags');box.innerHTML='';DTAGS=[];if
       const ok=()=>{if(done)return;done=true;const x=Math.round(parseMM(inp.value.replace(/^ø/i,''))*10)/10;if(x>0&&Math.abs(x-t.get())>1e-6){snap();t.set(x);const c=t.f.comp&&compOf(t.f.comp);if(c&&c.stock&&c.stock.len){c.stock.len=t.f.depth;c.name=`${c.stock.type} × ${FT(t.f.depth)}`;t.f.name=`${c.stock.type} ${t.f.depth} mm`}$('info').textContent='📏 Cote modifiée : '+x+' mm';rebuild()}else rebuild()};
       inp.onkeydown=ev=>{ev.stopPropagation();if(ev.key=='Enter')ok();if(ev.key=='Escape'){done=true;rebuild()}};inp.onblur=ok}});
   placeDims()}
-function placeDims(){if(!DTAGS.length)return;const r=R.domElement.getBoundingClientRect();DTAGS.forEach(t=>{const v=t.pos.clone().project(cam);if(!t.el)return;t.el.style.display=v.z>1||Math.abs(v.x)>1.1||Math.abs(v.y)>1.1?'none':'';t.el.style.left=(v.x+1)/2*r.width+'px';t.el.style.top=(1-v.y)/2*r.height+'px'})}
+function placeDims(){placeGhostTag();if(!DTAGS.length)return;const r=R.domElement.getBoundingClientRect();DTAGS.forEach(t=>{const v=t.pos.clone().project(cam);if(!t.el)return;t.el.style.display=v.z>1||Math.abs(v.x)>1.1||Math.abs(v.y)>1.1?'none':'';t.el.style.left=(v.x+1)/2*r.width+'px';t.el.style.top=(1-v.y)/2*r.height+'px'})}
 function featFrame(f){const o=new THREE.Object3D();if(f.plane=='XZ')o.rotation.x=-Math.PI/2;else if(f.plane=='YZ')o.rotation.y=Math.PI/2;o.position.set(f.x||0,f.y||0,f.z||0);o.updateMatrix();return o.matrix}
 function buildHandles(f,parent){handles=new THREE.Group();handles.matrixAutoUpdate=false;handles.matrix.copy(parent.matrixWorld).multiply(featFrame(f));
   const zc=f.sym?0:f.depth/2,isC=f.profile=='circle',hw=isC?f.d/2:f.w/2,hh=isC?f.d/2:f.h/2,cu=f.u||0,cv=f.v||0;
@@ -499,6 +499,35 @@ function startBox(e){ctl.enabled=false;const v=view.getBoundingClientRect(),d=do
   addEventListener('pointermove',mv);addEventListener('pointerup',up)}
 $('boxB').onclick=()=>{boxMode=!boxMode;$('boxB').classList.toggle('on',boxMode);$('info').textContent=boxMode?'⬚ Glissez un rectangle pour sélectionner (de droite à gauche : tout ce qui touche). Recliquez ⬚ Zone pour tourner la vue.':''};
 
+
+// ---------- Suggestion de la suite d'assemblage (fantôme rose, Tab pour ajouter) ----------
+let SUGG_ON=true;try{SUGG_ON=localStorage.getItem('drawgene-sugg')!='off'}catch(e){}
+const ghostG=new THREE.Group();scene.add(ghostG);let SUG=null,sugDismiss=null,ghostTag=null;
+const ghostMat=new THREE.MeshBasicMaterial({color:0xff6fbf,transparent:true,opacity:.38,depthWrite:false});
+const sigOf=c=>c.name+'|'+[c.rx||0,c.ry||0,c.rz||0].map(v=>Math.round(v)).join(',')+'|'+bodies().filter(f=>descIds(c).includes(f.comp)).map(f=>[f.w,f.h,f.d,f.depth,f.profile].join('x')+(f.cut?JSON.stringify(f.cut):'')).join(';');
+function computeSuggest(){if(!SUGG_ON||measuring||consPick)return null;const roots=comps().filter(c=>c.parent==null||!compOf(c.parent));if(roots.length<1)return null;
+  // 1) on vient de coller : la copie suivante au même espacement (comme Ctrl+V)
+  if(lastPaste&&clip&&lastPaste.roots){const prev=compOf(lastPaste.to),R0=lastPaste.roots.map(compOf).filter(Boolean);if(prev&&R0.length){const src=clip.comps.find(c=>c.id==clip.roots[0])||{},sp=[src.x||0,src.y||0,src.z||0];
+    const cur=[(prev.x||0)-sp[0],(prev.y||0)-sp[1],(prev.z||0)-sp[2]],d=cur.map((v,i)=>v-lastPaste.prevShift[i]);if(Math.hypot(...d)>1)return{kind:'paste',src:R0,d,label:'copie suivante'}}}
+  // 2) une série de pièces identiques à espacement régulier : la suivante
+  const last=roots[roots.length-1],sg=sigOf(last),same=roots.filter(c=>sigOf(c)==sg);if(same.length<2)return null;
+  const a=same[same.length-2],b=same[same.length-1],d=[(b.x||0)-(a.x||0),(b.y||0)-(a.y||0),(b.z||0)-(a.z||0)];const L=Math.hypot(...d);if(L<1||L>20000)return null;
+  if(same.length>=3){const z=same[same.length-3],d0=[(a.x||0)-(z.x||0),(a.y||0)-(z.y||0),(a.z||0)-(z.z||0)];if(Math.hypot(d0[0]-d[0],d0[1]-d[1],d0[2]-d[2])>2)return null}
+  const nx=(b.x||0)+d[0],ny=(b.y||0)+d[1],nz=(b.z||0)+d[2];if(same.some(c=>Math.hypot((c.x||0)-nx,(c.y||0)-ny,(c.z||0)-nz)<5))return null;
+  return{kind:'serie',src:[b],d,label:same.length+1+'e « '+b.name+' » ('+DGUnits.fmt(L)+')'}}
+function updateSuggest(){ghostG.clear();SUG=computeSuggest();const key=SUG&&JSON.stringify([SUG.kind,SUG.src.map(c=>c.id),SUG.d.map(Math.round)]);if(SUG&&key===sugDismiss)SUG=null;if(SUG)SUG.key=key;
+  if(ghostTag){ghostTag.remove();ghostTag=null}if(!SUG)return;group.updateMatrixWorld(true);const T=new THREE.Matrix4().makeTranslation(...SUG.d),bb=new THREE.Box3();
+  SUG.src.forEach(c=>{const g=gOf(c.id);if(!g)return;g.traverse(o=>{if(!o.isMesh)return;const m=new THREE.Mesh(o.geometry,ghostMat);m.matrixAutoUpdate=false;m.matrix.copy(T).multiply(o.matrixWorld);m.renderOrder=5;ghostG.add(m);
+    if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();bb.union(o.geometry.boundingBox.clone().applyMatrix4(m.matrix))})});
+  ghostTag=document.createElement('div');ghostTag.className='dtag';ghostTag.style.cssText+='background:#ff6fbfdd;border-color:#ff9ad5;color:#fff;cursor:pointer';ghostTag.textContent='⇥ Tab : '+SUG.label;ghostTag.title='Tab ou clic : ajouter · Échap : ignorer';
+  ghostTag.onpointerdown=e=>e.stopPropagation();ghostTag.onclick=e=>{e.stopPropagation();acceptSuggest()};ghostTag._p=bb.isEmpty()?new THREE.Vector3():bb.getCenter(new THREE.Vector3()).setY(bb.max.y);$('dimtags').append(ghostTag);placeGhostTag()}
+function placeGhostTag(){if(!ghostTag)return;const r=R.domElement.getBoundingClientRect(),v=ghostTag._p.clone().project(cam);ghostTag.style.display=v.z>1?'none':'';ghostTag.style.left=(v.x+1)/2*r.width+'px';ghostTag.style.top=((1-v.y)/2*r.height-14)+'px'}
+function acceptSuggest(){if(!SUG)return false;const s=SUG;if(s.kind=='paste'){pasteClip();return true}
+  snap();copySel(s.src.map(c=>c.id),true);const r=pasteClip(false,true);r.forEach(c=>{c.x=(c.x||0)+s.d[0];c.y=(c.y||0)+s.d[1];c.z=(c.z||0)+s.d[2]});lastPaste=null;sel='c'+r[r.length-1].id;selSet=[];rebuild();$('info').textContent='💡 Ajouté — Tab pour la suivante';return true}
+addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.key=='Tab'&&SUG){e.preventDefault();e.stopImmediatePropagation();acceptSuggest()}
+  else if(e.key=='Escape'&&SUG){sugDismiss=SUG.key;updateSuggest()}},true);
+
 // ---------- Suppression et menu clic droit ----------
 function deleteFeat(f){if(!f)return;const c=f.comp&&compOf(f.comp)||(fid(f.parent)&&fid(f.parent).comp&&compOf(fid(f.parent).comp));if(c&&isLocked(c)){alert('Cette pièce est verrouillée. Déverrouillez-la d\'abord.');return}
   snap();M.feats=M.feats.filter(x=>x.id!=f.id&&x.parent!=f.id);if(c&&!bodies().some(b=>b.comp==c.id)&&!kids(c).length){M.comps=comps().filter(x=>x!==c);M.cons=cons().filter(k=>k.a.comp!=c.id&&k.b.comp!=c.id)}sel=null;rebuild();$('info').textContent='🗑 Supprimé — Ctrl+Z pour annuler'}
@@ -531,7 +560,7 @@ function ctx3(e){const r=R.domElement.getBoundingClientRect();ray.setFromCamera(
     {icon:'▦',label:'Tout sélectionner',key:'Ctrl+A',disabled:!comps().length,action:()=>{selSet=comps().filter(c=>c.parent==null||!compOf(c.parent)).map(c=>c.id);sel=selSet.length==1?'c'+selSet[0]:'multi';if(selSet.length==1)selSet=[];rebuild()}},
     {icon:'🪵',label:'Ajouter du bois',action:()=>$('woodB').click()},{icon:'📏',label:'Mesurer',action:()=>$('measB').click()},{icon:'⛶',label:'Ajuster la vue',action:fitView});
   DGMenu.show(e.clientX,e.clientY,items)}
-$('delSel').onclick=deleteSelection;$('dosB').onclick=openDossier3D;
+$('delSel').onclick=deleteSelection;$('sugB').onclick=()=>{SUGG_ON=!SUGG_ON;try{localStorage.setItem('drawgene-sugg',SUGG_ON?'on':'off')}catch(e){}rebuild();$('info').textContent=SUGG_ON?'💡 Suggestions activées : la suite apparaît en rose, Tab pour l\'ajouter':'💡 Suggestions désactivées'};$('dosB').onclick=openDossier3D;
 $('unit3').innerHTML=DGUnits.options(DGUnits.get());$('unit3').onchange=()=>{DGUnits.set($('unit3').value);rebuild()};
 
 // ---------- Copier / coller (répète l'espacement) ----------
@@ -553,7 +582,7 @@ function pasteClip(doRebuild=true,keepPos=false){if(!clip){try{clip=JSON.parse(l
   if(!keepPos){let shift=[100,0,0];const prev=lastPaste&&compOf(lastPaste.to);
     if(prev){const cur=[(prev.x||0)-sp[0],(prev.y||0)-sp[1],(prev.z||0)-sp[2]],d=cur.map((v,i)=>v-lastPaste.prevShift[i]);shift=cur.map((v,i)=>v+d[i]);lastPaste={to:roots[0].id,prevShift:cur}}
     else lastPaste={to:roots[0].id,prevShift:[0,0,0]};
-    roots.forEach(c=>{c.x=(c.x||0)+shift[0];c.y=(c.y||0)+shift[1];c.z=(c.z||0)+shift[2]})}
+    roots.forEach(c=>{c.x=(c.x||0)+shift[0];c.y=(c.y||0)+shift[1];c.z=(c.z||0)+shift[2]});lastPaste.roots=roots.map(c=>c.id)}
   if(doRebuild){if(roots.length==1){sel='c'+roots[0].id;selSet=[]}else{selSet=roots.map(c=>c.id);sel='multi'}rebuild();$('info').textContent='📋 Collé — déplacez la copie puis Ctrl+V : la suivante gardera le même espacement'}
   return roots}
 
@@ -809,7 +838,7 @@ const WM=DGPanels.init('3d',$('main'),view,[{id:'tree',title:'Arbre du modèle',
 $('exCh').onclick=()=>{if(bodies().length&&!confirm('Remplacer le modèle actuel par la charpente exemple ?'))return;fetch('exemples/charpente-4-murs.drawgene').then(r=>r.text()).then(t=>openText(t,'Charpente 4 murs.drawgene')).catch(()=>alert('Exemple indisponible hors ligne la première fois.'))};
 DGMenu.group('✏ Créer ▾','Extrusion, révolution, trou, enlèvement',['fExt','fRev','fHole','fCut'],$('tbCreate'));
 DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, importer, exporter',['newB','openB','saveB','-','dosB','impB','stlB','objB','pngB'],$('tbEnd'));
-const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['exCh','houseB','lockAll','winB','treeT','propT'],$('tbEnd'));
+const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['sugB','exCh','houseB','lockAll','winB','treeT','propT'],$('tbEnd'));
 $('winB').onclick=()=>WM.menu(plusB);applyNiveau();$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('treeT').onclick=()=>WM.toggleDock('left');$('propT').onclick=()=>WM.toggleDock('right');
 resize();rebuild();fitView();
 </script>

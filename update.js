@@ -1,5 +1,5 @@
 // drawGene : détecte une nouvelle version et propose de l'installer en un clic
-(function(){const APPV=17;
+(function(){const APPV=18;
 function force(){const go=()=>location.replace(location.pathname+'?maj='+Date.now());
   Promise.all([window.caches?caches.keys().then(k=>Promise.all(k.map(x=>caches.delete(x)))):0,navigator.serviceWorker?navigator.serviceWorker.getRegistrations().then(r=>Promise.all(r.map(x=>x.unregister()))):0]).then(go,go)}
 function banner(){if(document.getElementById('dgupd'))return;const b=document.createElement('div');b.id='dgupd';

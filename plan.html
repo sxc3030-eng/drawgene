@@ -52,7 +52,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v17</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v18</small></b>
   <select id="mode" style="width:auto"><option value="bat">🏠 Bâtiment</option><option value="mec">⚙️ Pièce mécanique</option></select>
   <select id="unit" style="width:auto" title="Unités : mm, cm, m, pouces ou pieds-pouces"><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="in">pouces</option><option value="po">pieds-pouces</option></select>
   <button id="undo" title="Annuler (Ctrl+Z)">↶</button><button id="redo" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
@@ -60,7 +60,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
   <button id="fit">Ajuster</button><a href="modele3d.html"><button>🧊 3D</button></a>
   <span id="tbEnd"></span><button id="newB">📄 Nouveau</button><button id="saveB">💾 Enregistrer</button><button id="openB">📂 Ouvrir</button>
   <button id="photoB">📷 Photo de référence</button><button id="to3dB">⬆ Envoyer la pièce en 3D</button><button id="pngB">🖼 Exporter une image PNG</button><button id="dxfB">⬇ Exporter en DXF (AutoCAD)</button><button id="dxfI">⬆ Importer un DXF</button><button id="csvB">📊 Liste de matériaux (CSV)</button><button id="printB">🖨 Imprimer</button><button id="dosB">📄 Dossier complet (plans + matériaux)</button>
-  <button id="winB">🪟 Fenêtres…</button><button id="panelB">◨ Panneau de droite</button>
+  <button id="sugB">💡 Suggestions de la suite (activer / désactiver)</button><button id="winB">🪟 Fenêtres…</button><button id="panelB">◨ Panneau de droite</button>
   <input type="file" id="file" accept=".drawgene,.json,application/json" hidden><input type="file" id="photoF" accept="image/*" hidden><input type="file" id="dxfF" accept=".dxf" hidden>
 </div>
 <div id="main">
@@ -229,6 +229,7 @@ function draw(){DIMHITS=[];updateDims(false);const r=cv.getBoundingClientRect(),
   const o=W2S({x:0,y:0});ctx.strokeStyle='#5a2a2a';ctx.beginPath();ctx.moveTo(o.x,0);ctx.lineTo(o.x,H);ctx.stroke();ctx.strokeStyle='#2a5a2a';ctx.beginPath();ctx.moveTo(0,o.y);ctx.lineTo(W,o.y);ctx.stroke()}
   {const vis=S.ents.filter(e=>layerVis(e.layer)),oth=vis.filter(e=>e.layer!=S.curLayer),act=vis.filter(e=>e.layer==S.curLayer);
    if(oth.length){ctx.globalAlpha=S.dimOthers&&!printing?.35:1;drawEnts(oth);ctx.globalAlpha=1}drawEnts(act)}
+  {const sg=suggest2D();if(sg){ctx.save();ctx.strokeStyle='rgba(255,111,191,.85)';ctx.lineWidth=Math.max(3,(S.cfg.wallT||150)*view.s*(tool=='wall'?1:0)||3);ctx.setLineDash([10,6]);ctx.beginPath();sg.pts.forEach((q,i)=>{const s=W2S(q);i?ctx.lineTo(s.x,s.y):ctx.moveTo(s.x,s.y)});ctx.stroke();ctx.restore();const m=W2S(sg.pts[Math.floor(sg.pts.length/2)]);label(m,'⇥ Tab : '+sg.label,0,'#ff6fbf',-16,true)}}
   if(boxS){const x0=Math.min(boxS.a.x,boxS.b.x),y0=Math.min(boxS.a.y,boxS.b.y),cr=boxS.b.x<boxS.a.x;ctx.fillStyle=cr?'rgba(61,255,139,.08)':'rgba(61,139,255,.1)';ctx.strokeStyle=cr?'#3dff8b':'#3d8bff';ctx.setLineDash(cr?[5,4]:[]);ctx.lineWidth=1;ctx.fillRect(x0,y0,Math.abs(boxS.b.x-boxS.a.x),Math.abs(boxS.b.y-boxS.a.y));ctx.strokeRect(x0+.5,y0+.5,Math.abs(boxS.b.x-boxS.a.x),Math.abs(boxS.b.y-boxS.a.y));ctx.setLineDash([])}
   if(magHint){const s=W2S(magHint);ctx.strokeStyle='#ff6fbf';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(s.x,s.y,9,0,7);ctx.stroke();ctx.beginPath();ctx.arc(s.x,s.y,3,0,7);ctx.fillStyle='#ff6fbf';ctx.fill()}
   // aperçu de l'outil
@@ -381,7 +382,7 @@ cv.addEventListener('wheel',e=>{e.preventDefault();const sp=evPt(e),k=Math.exp(-
 
 function click(p){const P=pts,last=P[P.length-1];
   switch(tool){
-  case'wall':case'line':if(last&&dist(last,p)>0.01){snap0();if(tool=='wall')add({type:'wall',a:{...last},b:{...p},t:S.cfg.wallT,h:S.cfg.wallH,mat:S.cfg.wallMat});else add({type:'line',a:{...last},b:{...p}});pts=[p];changed()}else if(!last)pts=[p];break;
+  case'wall':case'line':if(!last){chain={start:{...p},n:0,tool}}if(last&&dist(last,p)>0.01){if(chain)chain.n++;snap0();if(tool=='wall')add({type:'wall',a:{...last},b:{...p},t:S.cfg.wallT,h:S.cfg.wallH,mat:S.cfg.wallMat});else add({type:'line',a:{...last},b:{...p}});pts=[p];changed()}else if(!last)pts=[p];break;
   case'measure':if(last){$('sInfo').textContent='Distance: '+fmt(dist(last,p))+'  ΔX '+fmt(p.x-last.x)+'  ΔY '+fmt(last.y-p.y)+'  Angle '+angDeg(last,p)+'°';alertBox('📐 '+fmt(dist(last,p))+'  ('+angDeg(last,p)+'°)');pts=[]}else pts=[p];break;
   case'rect':if(last){if(Math.abs(p.x-last.x)>0&&Math.abs(p.y-last.y)>0){snap0();add({type:'rect',a:{...last},b:{...p},role:defRole(shapeCenterRP(last,p))});changed()}pts=[]}else pts=[p];break;
   case'circle':if(last){const r=dist(last,p);if(r>0){snap0();add({type:'circle',c:{...last},r,role:defRole(last)});changed()}pts=[]}else pts=[p];break;
@@ -397,7 +398,7 @@ function click(p){const P=pts,last=P[P.length-1];
   draw()}
 const shapeCenterRP=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
 function defRole(c){if(S.mode!='mec')return'trait';return S.ents.some(e=>isShape(e)&&e.role=='contour'&&shapeContains(e,c))?'trou':'contour'}
-function finish(){if((tool=='room'||tool=='poly')&&pts.length>2){snap0();if(tool=='room'){const n=prompt('Nom de la pièce :','Pièce '+(S.ents.filter(e=>e.type=='room').length+1));add({type:'room',pts:pts.map(p=>({...p})),name:n||'Pièce',floor:'plancher'})}
+function finish(){if(tool!='wall'&&tool!='line')chain=null;else setTimeout(()=>{if(!pts.length)chain=null},0);if((tool=='room'||tool=='poly')&&pts.length>2){snap0();if(tool=='room'){const n=prompt('Nom de la pièce :','Pièce '+(S.ents.filter(e=>e.type=='room').length+1));add({type:'room',pts:pts.map(p=>({...p})),name:n||'Pièce',floor:'plancher'})}
   else add({type:'poly',pts:pts.map(p=>({...p})),closed:true,role:defRole(centroid(pts))});changed()}pts=[];entry='';showEntry();draw()}
 function alertBox(t){const h=$('help');h.textContent=t;h.style.color='#3dff8b';clearTimeout(alertBox.t);alertBox.t=setTimeout(()=>{h.style.color='';h.textContent=HELP[tool]},2500)}
 
@@ -470,6 +471,17 @@ function moveWithMagnet(d,w,noMag){const p=snapPoint(w),dx=p.x-d.start.x,dy=p.y-
   others.forEach(o=>{magPts(o).forEach(t=>mp.forEach(m=>{const dd=dist(m,t);if(dd<best.d)best={d:dd*0.6,v:{x:t.x-m.x,y:t.y-m.y},at:t}}));
     magSegs(o).forEach(([a,b])=>mp.forEach(m=>{const r=segDist(m,a,b);if(r.d<best.d){const q={x:a.x+(b.x-a.x)*r.t,y:a.y+(b.y-a.y)*r.t};best={d:r.d,v:{x:q.x-m.x,y:q.y-m.y},at:q}}}))});
   if(best.v){d.list.forEach(e=>translate(e,best.v.x,best.v.y));magHint=best.at;$('sInfo').textContent='🧲 collé (Alt = sans aimant)'}}
+
+
+// ---------- Suggestion de la suite (fantôme rose, Tab pour ajouter) ----------
+let SUGG_ON=true;try{SUGG_ON=localStorage.getItem('drawgene-sugg')!='off'}catch(e){}let chain=null;
+function suggest2D(){if(!SUGG_ON||!chain||(tool!='wall'&&tool!='line')||pts.length!=1||chain.n<2)return null;const S0=chain.start,B=pts[0];if(dist(S0,B)<1)return null;
+  const segs=S.ents.filter(e=>e.type==chain.tool).slice(-chain.n);if(segs.length<2)return null;const s1=segs[0],s2=segs[1];
+  if(chain.n==2&&dist(s1.a,S0)<1){const A=s1.b,u={x:A.x-S0.x,y:A.y-S0.y},v={x:B.x-A.x,y:B.y-A.y},dot=(u.x*v.x+u.y*v.y)/((Math.hypot(u.x,u.y)*Math.hypot(v.x,v.y))||1);
+    if(Math.abs(dot)<0.02){const D={x:S0.x+v.x,y:S0.y+v.y};return{pts:[B,D,S0],label:'fermer le rectangle'}}}
+  return{pts:[B,S0],label:'fermer le contour'}}
+function acceptSuggest2D(){const s=suggest2D();if(!s)return false;s.pts.slice(1).forEach(q=>click({...q}));finish();chain=null;alertBox('💡 Contour fermé');return true}
+addEventListener('keydown',e=>{const tg=e.target.tagName;if(tg=='INPUT'||tg=='SELECT'||tg=='TEXTAREA')return;if(e.key=='Tab'&&suggest2D()){e.preventDefault();e.stopImmediatePropagation();acceptSuggest2D()}},true);
 
 // ---------- Menu clic droit ----------
 const ENAME={wall:'Mur',line:'Ligne',rect:'Rectangle',circle:'Cercle',poly:'Polygone',room:'Pièce',door:'Porte',window:'Fenêtre',dim:'Cote',text:'Texte'};
@@ -851,7 +863,7 @@ $('dxfF').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(txt=
   out.forEach(o=>{if(o.type=='poly'&&o.pts.length<2)return;if(!isShape(o)||o.type=='poly'&&!o.closed)o.role='trait';add(o)});
   sh.forEach(o=>o.role=defRole(shapeCenter(o)));sel=null;changed();fit();alertBox('📥 '+out.length+' entités importées')});e.target.value=''};
 
-$('delSel').onclick=deleteSel;$('dosB').onclick=openDossier;
+$('delSel').onclick=deleteSel;$('sugB').onclick=()=>{SUGG_ON=!SUGG_ON;try{localStorage.setItem('drawgene-sugg',SUGG_ON?'on':'off')}catch(e){}draw();alertBox(SUGG_ON?'💡 Suggestions activées : Tab pour accepter':'💡 Suggestions désactivées')};$('dosB').onclick=openDossier;
 $('undo').onclick=undo;$('redo').onclick=redo;$('fit').onclick=fit;
 function toggle(k){S.cfg[k]=!S.cfg[k];$(k=='snap'?'snapB':'ortho').classList.toggle('on',S.cfg[k]);save()}
 $('ortho').onclick=()=>toggle('ortho');$('snapB').onclick=()=>toggle('snap');
@@ -873,7 +885,7 @@ const aiBox=DGAssist.mount('2d',AITOOLS,drawingSummary,{'Sélection':tb('select'
   'Calques':'#ltabs','Ajouter un calque':()=>[...document.querySelectorAll('#ltabs .tb')].find(x=>/Calque/.test(x.textContent)&&/＋/.test(x.textContent)),'Propriétés':tabB('props'),'Matériaux et coûts':tabB('mat'),'Réglages':tabB('cfg'),'Bibliothèque':'.dglib'});
 const WM=DGPanels.init('2d',$('main'),$('stage'),[{id:'tools',title:'Outils',el:$('tools'),dock:'left',w:64},{id:'side',title:'Propriétés',el:$('side'),dock:'right',w:300,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:300,weight:1},{id:'lia',title:'👩 Lia — votre assistante',el:aiBox,hideMin:true,dock:'float',x:Math.max(80,innerWidth-310-360),y:Math.max(60,innerHeight-Math.min(470,innerHeight-110)-12),w:350,h:Math.min(470,innerHeight-110)}]);
 DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, exporter',['newB','openB','saveB','-','dosB','printB','pngB','dxfB','dxfI','csvB','-','photoB'],$('tbEnd'));
-const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['to3dB','winB','panelB'],$('tbEnd'));
+const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['sugB','to3dB','winB','panelB'],$('tbEnd'));
 $('winB').onclick=()=>WM.menu(plusB);applyNiveau();$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('panelB').onclick=()=>WM.toggleDock('right');
 setMode(S.mode);renderCfg();resize();S.ents.forEach(e=>{if(e.id>=nid)nid=e.id+1});
 if(!S.ents.length)exampleHouse();else fit();renderProps();
