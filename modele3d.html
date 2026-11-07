@@ -46,7 +46,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v13</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v14</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a>
   <span id="tbCreate"></span><button id="fExt" data-add="extrude">⬆ Extrusion</button>
   <button id="fRev" data-add="revolve">🔄 Révolution</button>
@@ -55,7 +55,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
   <span class="sep"></span>
   <button id="woodB">🪵 Bois</button><button id="consB">🔗 Contrainte</button><button id="cutlB">📋 Liste de coupe</button><button id="lockAll">🔓 Assemblage</button>
   <span class="sep"></span>
-  <button id="houseB">🏠 Maison 3D depuis le plan</button>
+  <button id="exCh">🪵 Exemple : charpente 4 murs</button><button id="houseB">🏠 Maison 3D depuis le plan</button>
   <button id="undoB" title="Annuler (Ctrl+Z)">↶</button><button id="redoB" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
   <span id="tbEnd"></span><button id="newB">📄 Nouveau</button><button id="saveB">💾 Enregistrer</button><button id="openB">📂 Ouvrir</button><button id="impB">📥 Importer STEP / IGES / STL / OBJ</button><button id="stlB">⬇ Exporter STL (impression 3D)</button><button id="objB">⬇ Exporter OBJ</button><button id="pngB">🖼 Exporter une image PNG</button>
   <button id="winB">🪟 Fenêtres…</button><button id="treeT">◧ Panneau de gauche</button><button id="propT">◨ Panneau de droite</button>
@@ -607,7 +607,7 @@ function addWood(t,L,o,n,sp,at){const sh=SHEETS[t];if(!sh&&!LUMBER[t])throw new 
     const tgt=at||ctl.target,base={x:Math.round(tgt.x),z:Math.round(tgt.z)};
     for(let i=0;i<n;i++){const c={id:M.nid++,name:sh?t:`${t} × ${FT(L)}`,x:base.x+(o=='x'?0:i*sp),y:0,z:base.z+(o=='x'?i*sp:0),rx:sh?(o=='y'?0:-90):(o=='y'?-90:0),ry:o=='x'?90:0,rz:0,stock:{type:t,len:sh?null:Math.round(L)}};comps().push(c);
       const f=sh?{type:'extrude',name:t,plane:'XY',profile:'rect',w:1220,h:2440,d:10,r:0,pts:'',u:0,v:1220,depth:sh,sym:false,x:0,y:0,z:0,mat:'bois',qty:1,on:true}
-        :{type:'extrude',name:`${t} ${Math.round(L)} mm`,plane:'XY',profile:'rect',w:LUMBER[t][1],h:LUMBER[t][0],d:10,r:0,pts:'',u:0,v:0,depth:Math.round(L),sym:false,x:0,y:0,z:0,mat:'bois',qty:1,on:true};
+        :{type:'extrude',name:`${t} ${Math.round(L)} mm`,plane:'XY',profile:'rect',w:o=='y'?LUMBER[t][0]:LUMBER[t][1],h:o=='y'?LUMBER[t][1]:LUMBER[t][0],d:10,r:0,pts:'',u:0,v:0,depth:Math.round(L),sym:false,x:0,y:0,z:0,mat:'bois',qty:1,on:true};
       f.id=M.nid++;f.comp=c.id;M.feats.push(f);groundLater.push(c.id)}
     rebuild();groundLater.forEach(id=>{const c=compOf(id);if(c)groundComp(c)});groundLater=[];sel=null;rebuild();if(bodies().length<=n)fitView();$('info').textContent=`🪵 ${n} × ${t} ajouté(s)`}
 let groundLater=[];
@@ -705,10 +705,11 @@ const libBox=DGLib.mount(document.body,'3d',R.domElement,insert3D,{embedded:true
 const aiBox=DGAssist.mount('3d',AITOOLS,modelSummary,{'Menu Créer (Extrusion, Révolution, Trou, Enlèvement)':'.dgmb','Bois':'#woodB','Contrainte':'#consB','Liste de coupe':'#cutlB',
   'Annuler':'#undoB','Rétablir':'#redoB','Supprimer':'#delSel','Menu Fichier (Nouveau, Ouvrir, Enregistrer, importer, exporter)':'.dgmb','Retour au plan 2D':'a[href="plan.html"] button',
   'Vues (Iso, Face, Dessus)':'#vbtn','Mesurer':'#measB','Sélection par zone':'#boxB','Déplacer / Tourner':'#tmB','Vue en coupe':'#secB','Arbre du modèle':'#tree','Paramètres':'#props','Bibliothèque':'.dglib'});
-const WM=DGPanels.init('3d',$('main'),view,[{id:'tree',title:'Arbre du modèle',el:$('tree'),dock:'left',w:230},{id:'props',title:'Paramètres',el:$('props'),dock:'right',w:290,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:290,weight:1},{id:'lia',title:'👩 Lia — votre assistante',el:aiBox,dock:'float',x:Math.max(80,innerWidth-310-360),y:Math.max(60,innerHeight-Math.min(470,innerHeight-110)-12),w:350,h:Math.min(470,innerHeight-110)}]);
+const WM=DGPanels.init('3d',$('main'),view,[{id:'tree',title:'Arbre du modèle',el:$('tree'),dock:'left',w:230},{id:'props',title:'Paramètres',el:$('props'),dock:'right',w:290,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:290,weight:1},{id:'lia',title:'👩 Lia — votre assistante',el:aiBox,hideMin:true,dock:'float',x:Math.max(80,innerWidth-310-360),y:Math.max(60,innerHeight-Math.min(470,innerHeight-110)-12),w:350,h:Math.min(470,innerHeight-110)}]);
+$('exCh').onclick=()=>{if(bodies().length&&!confirm('Remplacer le modèle actuel par la charpente exemple ?'))return;fetch('exemples/charpente-4-murs.drawgene').then(r=>r.text()).then(t=>openText(t,'Charpente 4 murs.drawgene')).catch(()=>alert('Exemple indisponible hors ligne la première fois.'))};
 DGMenu.group('✏ Créer ▾','Extrusion, révolution, trou, enlèvement',['fExt','fRev','fHole','fCut'],$('tbCreate'));
 DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, importer, exporter',['newB','openB','saveB','-','impB','stlB','objB','pngB'],$('tbEnd'));
-const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['houseB','lockAll','winB','treeT','propT'],$('tbEnd'));
+const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['exCh','houseB','lockAll','winB','treeT','propT'],$('tbEnd'));
 $('winB').onclick=()=>WM.menu(plusB);applyNiveau();$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('treeT').onclick=()=>WM.toggleDock('left');$('propT').onclick=()=>WM.toggleDock('right');
 resize();rebuild();fitView();
 </script>

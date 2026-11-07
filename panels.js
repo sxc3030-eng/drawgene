@@ -44,7 +44,7 @@ const DGPanels={
       hd.addEventListener('pointerdown',e=>{if(e.target.tagName=='BUTTON')return;e.preventDefault();const sx=e.clientX,sy=e.clientY;let moved=false,ox=0,oy=0;
         const mv=ev=>{if(!moved&&Math.hypot(ev.clientX-sx,ev.clientY-sy)<6)return;
           if(!moved){moved=true;const r=w.getBoundingClientRect();if(p.mode!='float'){p.mode='float';p.w=Math.max(220,r.width);p.h=Math.max(160,Math.min(r.height,innerHeight*.6));p.x=ev.clientX-p.w/2;p.y=ev.clientY-12;layout()}ox=ev.clientX-p.x;oy=ev.clientY-p.y;w.style.zIndex=++z}
-          p.x=Math.min(innerWidth-60,Math.max(-p.w+60,ev.clientX-ox));p.y=Math.min(innerHeight-30,Math.max(0,ev.clientY-oy));w.style.left=p.x+'px';w.style.top=p.y+'px';
+          p.dragged=true;p.x=Math.min(innerWidth-60,Math.max(-p.w+60,ev.clientX-ox));p.y=Math.min(innerHeight-30,Math.max(0,ev.clientY-oy));w.style.left=p.x+'px';w.style.top=p.y+'px';
           hintL.style.display=ev.clientX<50?'block':'none';hintR.style.display=ev.clientX>innerWidth-50?'block':'none'};
         const up=ev=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);hintL.style.display=hintR.style.display='none';if(!moved)return;
           if(ev.clientX<50)dockTo(p,'left');else if(ev.clientX>innerWidth-50)dockTo(p,'right');else{save();}};
@@ -63,8 +63,8 @@ const DGPanels={
         const sp=document.createElement('div');sp.className='dgsplit';sp.title='Glisser pour élargir';d.append(sp);
         sp.onpointerdown=e=>{e.preventDefault();const sx=e.clientX,w0=dockW[side];const mv=ev=>{const dx=ev.clientX-sx;dockW[side]=Math.max(56,Math.min(innerWidth*.6,w0+(side=='left'?dx:-dx)));d.style.width=dockW[side]+'px';d.querySelectorAll('.dgp').forEach(x=>x.classList.toggle('narrow',dockW[side]<130));fire()};
           const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);save();fire()};addEventListener('pointermove',mv);addEventListener('pointerup',up)}});
-      Object.values(P).filter(p=>p.mode=='float'&&!p.hidden).forEach(p=>{const w=p.win;w.className='dgp float'+(p.min?' min':'')+(p.w<130?' narrow':'');
-        if(!p.min){p.h=Math.min(p.h,innerHeight-60);p.y=Math.min(p.y,innerHeight-p.h-6)}const fw=Math.min(p.w,innerWidth-12);if(p.x+fw>innerWidth-6)p.x=Math.max(6,innerWidth-fw-6);w.style.cssText=`left:${Math.min(Math.max(0,p.x),innerWidth-80)}px;top:${Math.min(Math.max(0,p.y),innerHeight-40)}px;width:${Math.min(p.w,innerWidth-12)}px;${p.min?'':'height:'+p.h+'px;'}z-index:${++z}`;if(w.parentNode!==document.body)document.body.append(w)});
+      Object.values(P).filter(p=>p.mode=='float'&&!p.hidden).forEach(p=>{const w=p.win;if(p.min&&p.def.hideMin){w.className='dgp';w.style.cssText='display:none';if(w.parentNode!==document.body)document.body.append(w);return}w.className='dgp float'+(p.min?' min':'')+(p.w<130?' narrow':'');
+        if(!p.min){p.h=Math.min(p.h,innerHeight-60);p.y=Math.min(p.y,innerHeight-p.h-6)}else if(!p.dragged){p.y=innerHeight-34;p.x=Math.max(6,innerWidth-210-8)}const fw=Math.min(p.w,innerWidth-12);if(p.x+fw>innerWidth-6)p.x=Math.max(6,innerWidth-fw-6);w.style.cssText=`left:${Math.min(Math.max(0,p.x),innerWidth-80)}px;top:${Math.min(Math.max(0,p.y),innerHeight-40)}px;width:${p.min?200:Math.min(p.w,innerWidth-12)}px;${p.min?'':'height:'+p.h+'px;'}z-index:${++z}`;if(w.parentNode!==document.body)document.body.append(w)});
       Object.values(P).filter(p=>p.hidden).forEach(p=>{p.win.className='dgp';p.win.style.cssText='display:none';if(p.win.parentNode!==document.body)document.body.append(p.win)});save();fire()}
     layout();
     const api={layout,

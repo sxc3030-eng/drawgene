@@ -51,7 +51,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v13</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v14</small></b>
   <select id="mode" style="width:auto"><option value="bat">🏠 Bâtiment</option><option value="mec">⚙️ Pièce mécanique</option></select>
   <select id="unit" style="width:auto"><option value="mm">mm</option><option value="m">m</option><option value="po">pi/po</option></select>
   <button id="undo" title="Annuler (Ctrl+Z)">↶</button><button id="redo" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
@@ -205,6 +205,7 @@ function allPts(e){if(e.pts)return e.pts;const r=[];['a','b','c','p'].forEach(k=
 
 // ---------- Accrochage ----------
 let snapInfo=null;
+let e_noAngle=false;
 function snapPoint(w,base){snapInfo=null;const tol=12/view.s;let best=null,bd=tol;
   const test=(p,kind)=>{const d=dist(p,w);if(d<bd){bd=d;best={x:p.x,y:p.y};snapInfo=kind}};
   S.ents.forEach(e=>{if(e.type=='text'||!layerVis(e.layer))return;allPts(e).forEach(p=>test(p,e.type=='circle'?'centre':'extrémité'));
@@ -215,6 +216,8 @@ function snapPoint(w,base){snapInfo=null;const tol=12/view.s;let best=null,bd=to
   if(best)return best;
   let p={...w};
   if(base&&(S.cfg.ortho!=shiftDown)){if(Math.abs(p.x-base.x)>Math.abs(p.y-base.y))p.y=base.y;else p.x=base.x}
+  else if(base&&!e_noAngle){const dx=p.x-base.x,dy=p.y-base.y,L=Math.hypot(dx,dy),A=Math.atan2(dy,dx),S45=Math.round(A/(Math.PI/4))*(Math.PI/4);
+    if(L>0&&Math.abs(A-S45)<4*Math.PI/180){const g=S.cfg.snap?gridStep():0,LL=g?Math.round(L/g)*g:L;snapInfo='angle '+Math.round(-S45*180/Math.PI+360)%360+'°';return{x:base.x+Math.cos(S45)*LL,y:base.y+Math.sin(S45)*LL}}}
   if(S.cfg.snap){const g=gridStep();if(base&&(S.cfg.ortho!=shiftDown)){if(p.y==base.y)p.x=base.x+Math.round((p.x-base.x)/g)*g;else p.y=base.y+Math.round((p.y-base.y)/g)*g}
     else{p.x=Math.round(p.x/g)*g;p.y=Math.round(p.y/g)*g}snapInfo=snapInfo||'grille'}
   return p}
@@ -595,14 +598,14 @@ function renderCfg(){const c=S.cfg;const C=$('cfg');
   <div style="display:flex;gap:6px;flex-wrap:wrap"><button id="phD">✨ Détecter contours</button><button id="ph3">⬆ Envoyer en 3D</button></div>`:''}
   <p class="note">1. Photographiez la pièce <b>bien de face</b>, sur un fond uni contrasté, avec une feuille A4 à côté.<br>2. 🔲 <b>Redresser</b> : cliquez les 4 coins de la feuille → la photo est corrigée et mise à l'échelle.<br>
   (ou 🎯 <b>Échelle</b> : 2 points + distance connue)<br>3. ✨ <b>Détecter</b> : contour et trous créés automatiquement (ou tracez par-dessus).<br>4. ⬆ <b>Envoyer en 3D</b> avec l'épaisseur.</p>
-  <h4>Exemples</h4><div style="display:flex;gap:6px;flex-wrap:wrap"><button id="exH">🏠 Maison exemple</button><button id="exP">⚙️ Pièce exemple</button></div>
+  <h4>Exemples</h4><div style="display:flex;gap:6px;flex-wrap:wrap"><button id="exM">🏡 Maison complète 36×28</button><button id="exH">🏠 Maison exemple</button><button id="exP">⚙️ Pièce exemple</button></div>
   <p class="note">Le dessin est sauvegardé automatiquement dans ce navigateur. « Enregistrer » ajoute la pièce à la 📚 bibliothèque et télécharge un fichier .drawgene (double-clic pour l'ouvrir dans drawGene installé).</p>
   <div class="bk" style="display:flex;gap:6px;margin-top:8px"><button onclick="DGUpdate.force()">🔄 Forcer la mise à jour</button></div>
   <p class="note"><a href="peinture.html" style="color:#9ec5ff">→ Ouvrir l'ancien module de dessin libre</a></p>`;
   const L=(id,k)=>$(id).onchange=()=>{const v=parseLen($(id).value);if(v>0)c[k]=v;renderCfg();save()};L('cT','wallT');L('cH','wallH');L('cE','ep');
   $('cM').onchange=()=>{c.wallMat=$('cM').value;save()};$('cS').onchange=()=>{c.stud=+$('cS').value;renderMat();save()};$('cF').onchange=()=>{c.faces=+$('cF').value;renderMat();save()};
   $('cMt').onchange=()=>{c.metal=$('cMt').value;renderMat();save()};$('cA').onchange=()=>{c.autoDim=$('cA').value=='1';draw();save()};
-  $('exH').onclick=exampleHouse;$('exP').onclick=examplePart;
+  $('exH').onclick=exampleHouse;$('exM').onclick=()=>{if(S.ents.length&&!confirm('Remplacer le dessin actuel par la maison exemple ?'))return;fetch('exemples/maison-36x28.drawgene').then(r=>r.text()).then(t=>openText(t,'Maison 36x28.drawgene')).catch(()=>alert('Exemple indisponible hors ligne la première fois.'))};$('exP').onclick=examplePart;
   $('phL').onclick=()=>$('photoF').click();if(S.bg){$('phX').onclick=()=>{S.bg=null;saveBg();renderCfg();draw()};$('phH').onclick=()=>{S.bg.show=S.bg.show===false;renderCfg();draw();save()};
   $('phO').oninput=()=>{S.bg.op=+$('phO').value;draw()};$('phO').onchange=save;$('phS').onchange=()=>{S.bg.sens=+$('phS').value;save()};$('phI').onchange=()=>{S.bg.pol=$('phI').value;save()};
   $('phE').onchange=()=>{const v=parseLen($('phE').value);if(v>0)S.cfg.ep=v;save()};$('phD').onclick=detectContours;$('ph3').onclick=sendTo3D}}
@@ -820,7 +823,7 @@ const tb=t=>()=>document.querySelector('#tools [data-t="'+t+'"]'),tabB=t=>()=>do
 const aiBox=DGAssist.mount('2d',AITOOLS,drawingSummary,{'Sélection':tb('select'),'Mur':tb('wall'),'Porte':tb('door'),'Fenêtre':tb('window'),'Pièce':tb('room'),'Ligne':tb('line'),'Rectangle':tb('rect'),'Cercle':tb('circle'),'Polygone':tb('poly'),'Cote':tb('dim'),'Texte':tb('text'),'Mesure':tb('measure'),'Échelle photo':tb('calib'),'Redresser photo':tb('rectify'),'Déplacer la vue':tb('pan'),
   'Menu Fichier (Nouveau, Ouvrir, Enregistrer, exporter)':'.dgmb','Annuler':'#undo','Rétablir':'#redo','Supprimer':'#delSel','Ortho':'#ortho','Aimant':'#snapB','Ajuster la vue':'#fit','Passer en 3D':'a[href="modele3d.html"] button','Mode bâtiment / pièce':'#mode','Unités':'#unit',
   'Calques':'#ltabs','Ajouter un calque':()=>[...document.querySelectorAll('#ltabs .tb')].find(x=>/Calque/.test(x.textContent)&&/＋/.test(x.textContent)),'Propriétés':tabB('props'),'Matériaux et coûts':tabB('mat'),'Réglages':tabB('cfg'),'Bibliothèque':'.dglib'});
-const WM=DGPanels.init('2d',$('main'),$('stage'),[{id:'tools',title:'Outils',el:$('tools'),dock:'left',w:64},{id:'side',title:'Propriétés',el:$('side'),dock:'right',w:300,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:300,weight:1},{id:'lia',title:'👩 Lia — votre assistante',el:aiBox,dock:'float',x:Math.max(80,innerWidth-310-360),y:Math.max(60,innerHeight-Math.min(470,innerHeight-110)-12),w:350,h:Math.min(470,innerHeight-110)}]);
+const WM=DGPanels.init('2d',$('main'),$('stage'),[{id:'tools',title:'Outils',el:$('tools'),dock:'left',w:64},{id:'side',title:'Propriétés',el:$('side'),dock:'right',w:300,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:300,weight:1},{id:'lia',title:'👩 Lia — votre assistante',el:aiBox,hideMin:true,dock:'float',x:Math.max(80,innerWidth-310-360),y:Math.max(60,innerHeight-Math.min(470,innerHeight-110)-12),w:350,h:Math.min(470,innerHeight-110)}]);
 DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, exporter',['newB','openB','saveB','-','photoB','pngB','dxfB','dxfI','csvB','printB'],$('tbEnd'));
 const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['to3dB','winB','panelB'],$('tbEnd'));
 $('winB').onclick=()=>WM.menu(plusB);applyNiveau();$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('panelB').onclick=()=>WM.toggleDock('right');
