@@ -13,6 +13,8 @@
 html,body{height:100%;background:var(--bg);color:var(--txt);font:13px system-ui,sans-serif;overflow:hidden}
 #top{height:46px;display:flex;align-items:center;gap:5px;padding:0 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto}
 #top b{margin-right:6px;white-space:nowrap;font-size:14px}
+body.simple .adv{display:none!important}
+#top #nivB{border-color:#3dff8b88}
 #top .lia{background:linear-gradient(135deg,#ff6fbf,#7b4dff);border:0;color:#fff;font-weight:700;padding:6px 12px;border-radius:18px}#top .dgmb{font-weight:600}
 button,select,input,textarea{font:inherit;color:var(--txt)}
 button{background:#2f333c;border:1px solid var(--line);border-radius:7px;padding:5px 9px;cursor:pointer;white-space:nowrap}
@@ -44,7 +46,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v12</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v13</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a>
   <span id="tbCreate"></span><button id="fExt" data-add="extrude">⬆ Extrusion</button>
   <button id="fRev" data-add="revolve">🔄 Révolution</button>
@@ -81,6 +83,13 @@ const DENS={acier:7850,inox:8000,alu:2700,laiton:8500,cuivre:8960,bois:600,pvc:1
 const COLORS={acier:0x9aa3ad,inox:0xc8cdd2,alu:0xd5d9de,laiton:0xc9a640,cuivre:0xc77a4a,bois:0xc9a46a,pvc:0xe8e8e8,acrylique:0x9fd4ff,beton:0xa0a0a0};
 const PLANES={XY:'Avant (XY)',XZ:'Dessus (XZ)',YZ:'Droite (YZ)'};
 
+
+// ---------- Niveau : Simple (par défaut) ou Expert ----------
+const NIV_KEY='drawgene-niveau';let SIMPLE=true;try{SIMPLE=localStorage.getItem(NIV_KEY)!='expert'}catch(e){}
+function applyNiveau(){document.body.classList.toggle('simple',SIMPLE);const b=$('nivB');if(b){b.textContent=SIMPLE?'🎓 Simple':'🛠 Expert';b.title=SIMPLE?'Mode simple : seulement l\'essentiel. Cliquer pour tout afficher (Expert).':'Mode expert : tous les outils. Cliquer pour revenir au mode simple.'}NIV_HOOK()}
+function toggleNiveau(){SIMPLE=!SIMPLE;try{localStorage.setItem(NIV_KEY,SIMPLE?'simple':'expert')}catch(e){}applyNiveau()}
+function NIV_HOOK(){['consB','boxB','tmB','secB','clrM','wireB','edgeB'].forEach(i=>$(i)&&$(i).classList.add('adv'));document.querySelectorAll('#vbtn [data-v="right"]').forEach(x=>x.classList.add('adv'));
+  if(typeof WM!='undefined'&&WM.panels.tree){WM.panels.tree.hidden=SIMPLE;WM.layout()}}
 // ---------- Modèle paramétrique ----------
 let M={feats:[],nid:1},sel=null,undoS=[],redoS=[];
 function snap(){undoS.push(JSON.stringify(M));if(undoS.length>80)undoS.shift();redoS=[]}
@@ -340,8 +349,9 @@ function massTable(){const b=bodies().filter(f=>f.on&&f._kg!=null);if(!b.length&
 // ---------- Sélection, flèches, poignées, contraintes ----------
 const ray=new THREE.Raycaster();let down=null,consPick=0,consA=null;
 const ndc=(e,r)=>({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1});
-tc.addEventListener('mouseDown',()=>snap());
+let tcOthers=null,tcTol=10;tc.addEventListener('mouseDown',()=>{snap();const c=tc.object&&compOf(tc.object.userData.comp);if(c&&c.parent==null){tcOthers=magnetTargets([c]);tcTol=pxToWorld(tc.object.position,14)}else tcOthers=null});
 tc.addEventListener('objectChange',()=>{const o=tc.object,c=o&&compOf(o.userData.comp);if(!c)return;const r=v=>Math.round(v*100)/100;
+  if(tcOthers&&tc.getMode()=='translate'){const mg=magnet(boxOfRoots([c]),tcOthers,tcTol);if(mg){o.position.x+=mg.d[0];o.position.y+=mg.d[1];o.position.z+=mg.d[2]}}
   c.x=r(o.position.x);c.y=r(o.position.y);c.z=r(o.position.z);c.rx=r(o.rotation.x/D2R);c.ry=r(o.rotation.y/D2R);c.rz=r(o.rotation.z/D2R);$('info').textContent=`🧩 ${c.name}   X ${c.x}  Y ${c.y}  Z ${c.z}   Rot ${c.rx}° ${c.ry}° ${c.rz}°`});
 tc.addEventListener('mouseUp',()=>{down=null;setTimeout(rebuild,0)});
 let rdown=null;R.domElement.addEventListener('contextmenu',e=>{e.preventDefault();if(rdown&&Math.hypot(e.clientX-rdown.x,e.clientY-rdown.y)<6)ctx3(e);rdown=null});
@@ -363,16 +373,35 @@ R.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,b:
       $('info').textContent=f.profile=='rect'?`↔ ${f.w} × ${f.h} × ${f.depth} mm`:`↔ Ø${f.d} × ${f.depth} mm`;rebuild()};
     const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);ctl.enabled=true;down=null;rebuild()};
     addEventListener('pointermove',mv);addEventListener('pointerup',up);return}}
-  // 2) glisser le composant sélectionné directement
-  const c=selComp();if(!c||isLocked(c))return;const ids=descIds(c);
-  const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh&&ids.includes(x.object.userData.comp));if(!h.length)return;
-  const RC=rootOf(c);ctl.enabled=false;snap();const p0=h[0].point.clone(),vert=e.shiftKey,n=vert?cam.getWorldDirection(new THREE.Vector3()).setY(0).normalize():new THREE.Vector3(0,1,0);
-  const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(n,p0),W0=worldMat(RC),q=new THREE.Vector3(),stp=M.step||1;let moved=false;
-  const mv=ev=>{ray.setFromCamera(ndc(ev,r),cam);if(!ray.ray.intersectPlane(plane,q))return;const d=q.sub(p0),sn=v=>Math.round(v/stp)*stp;moved=true;
-    const W=new THREE.Matrix4().makeTranslation(vert?0:sn(d.x),vert?sn(d.y):0,vert?0:sn(d.z)).multiply(W0);setWorld(RC,W);
-    const g=[];group.traverse(o=>{if(o.userData&&o.userData.comp==RC.id&&o.isGroup)g.push(o)});if(g[0]){g[0].position.set(RC.x,RC.y,RC.z)}$('info').textContent=`🧩 ${RC.name}  X ${RC.x}  Y ${RC.y}  Z ${RC.z} mm`};
+  // 2) attraper une pièce et la glisser (aimant : elle s'aligne et se colle aux autres)
+  const hAll=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh&&x.object.userData.comp);if(!hAll.length)return;
+  const hitRoot=rootOf(compOf(hAll[0].object.userData.comp));if(!hitRoot||isLocked(hitRoot))return;
+  let roots=sel=='multi'&&selSet.includes(hitRoot.id)?selSet.map(compOf).filter(Boolean).map(rootOf):[hitRoot];roots=[...new Set(roots)].filter(x=>!isLocked(x));if(!roots.length)return;
+  if(!(sel=='multi'&&selSet.includes(hitRoot.id))&&!(selComp()&&rootOf(selComp())===hitRoot)){sel='c'+hitRoot.id;selSet=[];rebuild()}
+  ctl.enabled=false;snap();const p0=hAll[0].point.clone(),vert=e.shiftKey,n=vert?cam.getWorldDirection(new THREE.Vector3()).setY(0).normalize():new THREE.Vector3(0,1,0);
+  const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(n,p0),start=roots.map(x=>({c:x,x:x.x||0,y:x.y||0,z:x.z||0})),q=new THREE.Vector3(),stp=M.step||1;let moved=false;
+  const others=magnetTargets(roots),tolW=pxToWorld(p0,14);
+  const mv=ev=>{ray.setFromCamera(ndc(ev,r),cam);if(!ray.ray.intersectPlane(plane,q))return;const d=q.clone().sub(p0),sn=v=>Math.round(v/stp)*stp;moved=true;
+    const dd=[vert?0:sn(d.x),vert?sn(d.y):0,vert?0:sn(d.z)];start.forEach(s=>{s.c.x=s.x+dd[0];s.c.y=s.y+dd[1];s.c.z=s.z+dd[2];const g=gOf(s.c.id);if(g)g.position.set(s.c.x,s.c.y,s.c.z)});
+    const mg=ev.altKey?null:magnet(boxOfRoots(roots),others,tolW);
+    if(mg){start.forEach(s=>{s.c.x=+(s.c.x+mg.d[0]).toFixed(2);s.c.y=+(s.c.y+mg.d[1]).toFixed(2);s.c.z=+(s.c.z+mg.d[2]).toFixed(2);const g=gOf(s.c.id);if(g)g.position.set(s.c.x,s.c.y,s.c.z)})}
+    $('info').textContent=`🧩 ${roots.length>1?roots.length+' pièces':hitRoot.name}  X ${hitRoot.x}  Y ${hitRoot.y}  Z ${hitRoot.z} mm`+(mg&&mg.hit.length?`\n🧲 collé à « ${[...new Set(mg.hit)].join(' », « ')} » (Alt = sans aimant)`:'')};
   const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);ctl.enabled=true;if(moved){down=null;rebuild()}else undoS.pop()};
   addEventListener('pointermove',mv);addEventListener('pointerup',up)});
+// ---------- Aimant : les pièces s'alignent et se collent quand on les approche ----------
+function gOf(id){let g=null;group.traverse(o=>{if(!g&&o.isGroup&&o.userData.comp==id)g=o});return g}
+function boxOfRoots(roots){const b=new THREE.Box3();roots.forEach(x=>{const g=gOf(x.id);if(g){g.updateMatrixWorld(true);g.traverse(o=>{if(o.isMesh)b.expandByObject(o)})}});return b}
+function magnetTargets(moving){const ids=new Set(moving.map(x=>x.id));return comps().filter(c=>(c.parent==null||!compOf(c.parent))&&!ids.has(c.id)).map(c=>({name:c.name,id:c.id,b:boxOfRoots([c])})).filter(o=>!o.b.isEmpty())}
+function pxToWorld(p,px){const r=R.domElement.getBoundingClientRect();return cam.position.distanceTo(p)*Math.tan(cam.fov*Math.PI/360)*2/r.height*px}
+function magnet(mb,others,tol){if(mb.isEmpty())return null;const ax=['x','y','z'],d=[0,0,0],hit=[];
+  ax.forEach((a,i)=>{let best=tol,bd=null,bn=null;
+    others.forEach(o=>{const B=o.b;if(!ax.every((b2,j)=>j==i||(mb.min[b2]<=B.max[b2]+tol&&mb.max[b2]>=B.min[b2]-tol)))return;
+      [B.min[a]-mb.max[a],B.max[a]-mb.min[a],B.min[a]-mb.min[a],B.max[a]-mb.max[a]].forEach(v=>{if(Math.abs(v)<best){best=Math.abs(v);bd=v;bn=o.name}})});
+    if(a=='y'&&Math.abs(mb.min.y)<best){bd=-mb.min.y;bn='sol'}
+    if(bd!=null&&Math.abs(bd)>1e-6){d[i]=bd;hit.push(bn)}else if(bd!=null)hit.push(bn)});
+  return{d,hit}}
+function touchingCluster(root){const all=comps().filter(c=>c.parent==null||!compOf(c.parent)).map(c=>({c,b:boxOfRoots([c]).expandByScalar(1)})),out=new Set([root.id]),stack=[root.id];
+  while(stack.length){const cur=all.find(x=>x.c.id==stack.pop());all.forEach(o=>{if(!out.has(o.c.id)&&!o.b.isEmpty()&&o.b.intersectsBox(cur.b)){out.add(o.c.id);stack.push(o.c.id)}})}return[...out]}
 R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down.x,e.clientY-down.y)>4)return;if(e.button==2||down.b==2){down=null;return}const r=R.domElement.getBoundingClientRect();
   ray.setFromCamera(ndc(e,r),cam);const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh);
   if(measuring){if(!h.length)return;measurePick(h[0]);return}
@@ -422,6 +451,7 @@ function ctx3(e){const r=R.domElement.getBoundingClientRect();ray.setFromCamera(
     items.push({icon:'📋',label:'Copier',key:'Ctrl+C',action:()=>{copySel([C.id],true);$('info').textContent='📋 Copié'}},
       {icon:'⧉',label:'Dupliquer',key:'Ctrl+D',disabled:lk,action:()=>{copySel([C.id],true);pasteClip()}},
       {icon:'✏',label:'Modifier les cotes',action:()=>{sel=f.id;selSet=[];rebuild()}},
+      {icon:'🧲',label:'Sélectionner les pièces collées',action:()=>{const ids=touchingCluster(RT);if(ids.length==1){sel='c'+ids[0];selSet=[]}else{selSet=ids;sel='multi'}rebuild();$('info').textContent='🧲 '+ids.length+' pièce(s) collée(s) sélectionnée(s) — glissez pour les déplacer ensemble'}},
       {icon:'✥',label:'Sélectionner'+(RT!==C?' cette pièce seule':''),action:()=>{sel='c'+C.id;selSet=[];rebuild()}},
       {icon:'↻',label:'Tourner 90°',key:'Alt+→',disabled:lk,action:()=>{snap();RT.ry=((RT.ry||0)+90)%360;rebuild()}},
       {icon:'⤓',label:'Poser au sol',disabled:lk,action:()=>{snap();groundComp(RT);rebuild()}},
@@ -679,7 +709,7 @@ const WM=DGPanels.init('3d',$('main'),view,[{id:'tree',title:'Arbre du modèle',
 DGMenu.group('✏ Créer ▾','Extrusion, révolution, trou, enlèvement',['fExt','fRev','fHole','fCut'],$('tbCreate'));
 DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, importer, exporter',['newB','openB','saveB','-','impB','stlB','objB','pngB'],$('tbEnd'));
 const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['houseB','lockAll','winB','treeT','propT'],$('tbEnd'));
-$('winB').onclick=()=>WM.menu(plusB);$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('treeT').onclick=()=>WM.toggleDock('left');$('propT').onclick=()=>WM.toggleDock('right');
+$('winB').onclick=()=>WM.menu(plusB);applyNiveau();$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('treeT').onclick=()=>WM.toggleDock('left');$('propT').onclick=()=>WM.toggleDock('right');
 resize();rebuild();fitView();
 </script>
 </body>

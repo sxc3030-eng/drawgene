@@ -13,6 +13,8 @@
 html,body{height:100%;background:var(--bg);color:var(--txt);font:13px system-ui,sans-serif;overflow:hidden}
 #top{height:46px;display:flex;align-items:center;gap:5px;padding:0 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto}
 #top b{margin-right:6px;white-space:nowrap;font-size:14px}
+body.simple .adv{display:none!important}
+#top #nivB{border-color:#3dff8b88}
 #top .lia{background:linear-gradient(135deg,#ff6fbf,#7b4dff);border:0;color:#fff;font-weight:700;padding:6px 12px;border-radius:18px}#top .dgmb{font-weight:600}
 button,select,input{font:inherit;color:var(--txt)}
 button{background:#2f333c;border:1px solid var(--line);border-radius:7px;padding:5px 9px;cursor:pointer;white-space:nowrap}
@@ -49,7 +51,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v12</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v13</small></b>
   <select id="mode" style="width:auto"><option value="bat">🏠 Bâtiment</option><option value="mec">⚙️ Pièce mécanique</option></select>
   <select id="unit" style="width:auto"><option value="mm">mm</option><option value="m">m</option><option value="po">pi/po</option></select>
   <button id="undo" title="Annuler (Ctrl+Z)">↶</button><button id="redo" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
@@ -131,7 +133,8 @@ const HELP={select:'Clic droit : menu · Glisser dans le vide : sélection par r
  circle:'Clic centre, clic rayon. Tapez un diamètre + Entrée. Un cercle dans une pièce = trou',
  poly:'Cliquez les sommets, Entrée ou 1er point pour fermer',dim:'Clic point A, clic point B, clic position de la cote',
  text:'Clic pour placer un texte',measure:'Clic A, clic B : affiche la distance',calib:'Photo : cliquez 2 points d\'une distance connue, puis entrez la vraie distance',rectify:'Photo prise de biais : cliquez les 4 coins d\'une feuille/rectangle connu (haut-gauche, haut-droit, bas-droit, bas-gauche)',pan:'Glisser pour déplacer la vue · molette/pincer: zoom'};
-function buildTools(){const t=$('tools');t.innerHTML='';TOOLS.forEach(([id,ic,lb,k,m])=>{if(m!='both'&&m!=S.mode)return;
+const ADV_TOOLS=['poly','calib','rectify','measure'];
+function buildTools(){const t=$('tools');t.innerHTML='';TOOLS.forEach(([id,ic,lb,k,m])=>{if(m!='both'&&m!=S.mode)return;if(SIMPLE&&ADV_TOOLS.includes(id))return;
   const b=document.createElement('button');b.innerHTML=`<i>${ic}</i>${lb}`;b.title=lb+' ('+k+')';b.dataset.t=id;b.onclick=()=>setTool(id);t.append(b)});setTool(tool)}
 function setTool(t){if(!TOOLS.find(x=>x[0]==t&&(x[4]=='both'||x[4]==S.mode)))t='select';tool=t;pts=[];entry='';showEntry();
   document.querySelectorAll('#tools button').forEach(b=>b.classList.toggle('on',b.dataset.t==t));$('help').textContent=HELP[t];cv.style.cursor=t=='pan'?'grab':t=='select'?'default':'crosshair';draw()}
@@ -155,9 +158,15 @@ function renderTabs(){const T=$('ltabs');T.innerHTML='';
   const add=document.createElement('div');add.className='tb';add.textContent='＋ Calque';add.title='Nouveau calque';
   add.onclick=()=>{const id=Math.max(0,...S.layers.map(l=>l.id))+1,sug=S.mode=='bat'?['Murs','Électricité','Plomberie','Mobilier','Terrain','Cotes']:['Pièce','Trous','Cotes','Assemblage','Construction'];
     const v=prompt('Nom du nouveau calque :',sug[(S.layers.length-1)%sug.length]||'Calque '+id);if(!v)return;S.layers.push({id,name:v.trim(),vis:true,lock:false});S.curLayer=id;renderTabs();draw();save()};T.append(add);
-  const dim=document.createElement('div');dim.className='tb';dim.style.marginLeft='auto';dim.textContent=S.dimOthers?'◐ Autres atténués':'● Tous pleins';dim.title='Atténuer les autres calques';
+  const dim=document.createElement('div');dim.className='tb adv';dim.style.marginLeft='auto';dim.textContent=S.dimOthers?'◐ Autres atténués':'● Tous pleins';dim.title='Atténuer les autres calques';
   dim.onclick=()=>{S.dimOthers=!S.dimOthers;renderTabs();draw();save()};T.append(dim)}
 
+
+// ---------- Niveau : Simple (par défaut) ou Expert ----------
+const NIV_KEY='drawgene-niveau';let SIMPLE=true;try{SIMPLE=localStorage.getItem(NIV_KEY)!='expert'}catch(e){}
+function applyNiveau(){document.body.classList.toggle('simple',SIMPLE);const b=$('nivB');if(b){b.textContent=SIMPLE?'🎓 Simple':'🛠 Expert';b.title=SIMPLE?'Mode simple : seulement l\'essentiel. Cliquer pour tout afficher (Expert).':'Mode expert : tous les outils. Cliquer pour revenir au mode simple.'}NIV_HOOK()}
+function toggleNiveau(){SIMPLE=!SIMPLE;try{localStorage.setItem(NIV_KEY,SIMPLE?'simple':'expert')}catch(e){}applyNiveau()}
+function NIV_HOOK(){['ortho','snapB'].forEach(i=>$(i)&&$(i).classList.add('adv'));if(S&&S.mode)buildTools();draw()}
 // ---------- Historique ----------
 function snap0(){undoS.push(JSON.stringify(S.ents));if(undoS.length>100)undoS.shift();redoS=[]}
 function undo(){if(!undoS.length)return;redoS.push(JSON.stringify(S.ents));S.ents=JSON.parse(undoS.pop());sel=null;msel=[];changed()}
@@ -224,6 +233,7 @@ function draw(){DIMHITS=[];updateDims(false);const r=cv.getBoundingClientRect(),
   {const vis=S.ents.filter(e=>layerVis(e.layer)),oth=vis.filter(e=>e.layer!=S.curLayer),act=vis.filter(e=>e.layer==S.curLayer);
    if(oth.length){ctx.globalAlpha=S.dimOthers&&!printing?.35:1;drawEnts(oth);ctx.globalAlpha=1}drawEnts(act)}
   if(boxS){const x0=Math.min(boxS.a.x,boxS.b.x),y0=Math.min(boxS.a.y,boxS.b.y),cr=boxS.b.x<boxS.a.x;ctx.fillStyle=cr?'rgba(61,255,139,.08)':'rgba(61,139,255,.1)';ctx.strokeStyle=cr?'#3dff8b':'#3d8bff';ctx.setLineDash(cr?[5,4]:[]);ctx.lineWidth=1;ctx.fillRect(x0,y0,Math.abs(boxS.b.x-boxS.a.x),Math.abs(boxS.b.y-boxS.a.y));ctx.strokeRect(x0+.5,y0+.5,Math.abs(boxS.b.x-boxS.a.x),Math.abs(boxS.b.y-boxS.a.y));ctx.setLineDash([])}
+  if(magHint){const s=W2S(magHint);ctx.strokeStyle='#ff6fbf';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(s.x,s.y,9,0,7);ctx.stroke();ctx.beginPath();ctx.arc(s.x,s.y,3,0,7);ctx.fillStyle='#ff6fbf';ctx.fill()}
   // aperçu de l'outil
   drawPreview();
   // points sélection
@@ -342,8 +352,8 @@ cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);pointers
     if(se&&se.type!='room'){const ps=allPts(se);for(const p of ps)if(dist(W2S(p),sp)<10){snap0();drag={kind:'pt',p,moved:false};return}}
     const h=hit(w),add2=e.ctrlKey||e.metaKey||e.shiftKey;
     if(add2&&h){if(!msel.length&&sel!=null&&sel!=h.id)msel=[sel];const i=msel.indexOf(h.id);if(i>=0)msel.splice(i,1);else msel.push(h.id);sel=msel.length==1?msel[0]:null;if(msel.length==1)msel=[];renderProps();draw();return}
-    if(h&&isSel(h)&&msel.length){snap0();drag={kind:'multi',last:snapPoint(w),moved:false};draw();return}
-    msel=[];sel=h?h.id:null;renderProps();if(h){snap0();drag={kind:'move',e:h,last:snapPoint(w),moved:false}}else if(e.pointerType=='touch'){panS={sp,v:{...view}}}else{boxS={a:sp,b:sp,add:add2}}draw();return}
+    if(h&&isSel(h)&&msel.length){snap0();drag=startMove(selEnts(),w);draw();return}
+    msel=[];sel=h?h.id:null;renderProps();if(h){snap0();drag=startMove(h.grp?S.ents.filter(x=>x.grp==h.grp):[h],w)}else if(e.pointerType=='touch'){panS={sp,v:{...view}}}else{boxS={a:sp,b:sp,add:add2}}draw();return}
   click(cur)});
 cv.addEventListener('pointermove',e=>{if(pointers.has(e.pointerId))pointers.set(e.pointerId,evPt(e));
   if(pinch&&pointers.size==2){const [a,b]=[...pointers.values()],m={x:(a.x+b.x)/2,y:(a.y+b.y)/2},k=dist(a,b)/pinch.d,ns=pinch.v.s*k;
@@ -353,13 +363,12 @@ cv.addEventListener('pointermove',e=>{if(pointers.has(e.pointerId))pointers.set(
   if(boxS){boxS.b=sp;draw();return}
   if(panS){view.x=panS.v.x+sp.x-panS.sp.x;view.y=panS.v.y+sp.y-panS.sp.y;draw();return}
   if(drag){if(drag.kind=='pt'){const p=snapPoint(w);drag.p.x=p.x;drag.p.y=p.y}
-    else if(drag.kind=='multi'){const p=snapPoint(w),dx=p.x-drag.last.x,dy=p.y-drag.last.y;selEnts().forEach(x=>translate(x,dx,dy));drag.last=p}
-    else{const p=snapPoint(w),dx=p.x-drag.last.x,dy=p.y-drag.last.y;(drag.e.grp?S.ents.filter(x=>x.grp==drag.e.grp):[drag.e]).forEach(x=>translate(x,dx,dy));drag.last=p}
+    else moveWithMagnet(drag,w,e.altKey);
     drag.moved=true;attachOpenings();draw();return}
   if(tool=='select'&&!drag&&!panS)cv.style.cursor=dimAt(sp)?'text':'default';
   cur=tool=='select'||tool=='pan'||tool=='calib'||tool=='rectify'?(snapInfo=null,w):snapPoint(w,pts[pts.length-1]);
   $('sXY').textContent='X '+fmt(cur.x)+'  Y '+fmt(-cur.y);$('sInfo').textContent=snapInfo&&tool!='select'?'⌖ '+snapInfo:'';draw()});
-const up=e=>{pointers.delete(e.pointerId);if(pointers.size<2)pinch=null;
+const up=e=>{pointers.delete(e.pointerId);magHint=null;if(pointers.size<2)pinch=null;
   if(rpan&&e.button==2){const r=rpan;rpan=null;cv.style.cursor=tool=='select'?'default':'crosshair';if(!r.moved)ctxMenu(e,r.sp);return}
   if(boxS){const B=boxS;boxS=null;const x0=Math.min(B.a.x,B.b.x),x1=Math.max(B.a.x,B.b.x),y0=Math.min(B.a.y,B.b.y),y1=Math.max(B.a.y,B.b.y),cross=B.b.x<B.a.x;
     if(x1-x0>4||y1-y0>4){const inR=q=>{const s=W2S(q);return s.x>=x0&&s.x<=x1&&s.y>=y0&&s.y<=y1};
@@ -447,6 +456,24 @@ function openDimEd(h){closeDimEd();const sr=$('stage').getBoundingClientRect(),c
   inp.onkeydown=ev=>{ev.stopPropagation();if(ev.key=='Enter')ok();if(ev.key=='Escape'){done=true;closeDimEd()}};inp.onblur=ok}
 function closeDimEd(){const x=$('dimEd');if(x)x.remove()}
 
+// ---------- Aimant 2D : approcher deux pièces les colle et les aligne ----------
+let magHint=null;
+function startMove(list,w){const p=snapPoint(w);return{kind:'move',list,orig:list.map(e=>JSON.parse(JSON.stringify(e))),start:{x:p.x,y:p.y},moved:false}}
+function magPts(e){let P=[];if(e.type=='rect')P=rectPts(e);else if(e.type=='circle')P=[e.c,{x:e.c.x+e.r,y:e.c.y},{x:e.c.x-e.r,y:e.c.y},{x:e.c.x,y:e.c.y+e.r},{x:e.c.x,y:e.c.y-e.r}];else if(e.type!='dim'&&e.type!='text')P=allPts(e);
+  if(e.type=='wall'){const L=dist(e.a,e.b)||1,nx=-(e.b.y-e.a.y)/L*e.t/2,ny=(e.b.x-e.a.x)/L*e.t/2;[e.a,e.b].forEach(q=>P.push({x:q.x+nx,y:q.y+ny},{x:q.x-nx,y:q.y-ny}))}return P}
+function magSegs(e){if(e.type=='wall'){const L=dist(e.a,e.b)||1,nx=-(e.b.y-e.a.y)/L*e.t/2,ny=(e.b.x-e.a.x)/L*e.t/2;return[[e.a,e.b],[{x:e.a.x+nx,y:e.a.y+ny},{x:e.b.x+nx,y:e.b.y+ny}],[{x:e.a.x-nx,y:e.a.y-ny},{x:e.b.x-nx,y:e.b.y-ny}]]}
+  if(e.type=='line')return[[e.a,e.b]];const P=e.type=='rect'?rectPts(e):e.type=='poly'||e.type=='room'?e.pts:null;if(!P)return[];return P.map((q,i)=>[q,P[(i+1)%P.length]])}
+function linkedCluster(start){const vis=S.ents.filter(e=>layerVis(e.layer)&&e.type!='dim'&&e.type!='text'),out=new Set(start.map(e=>e.id)),st=[...start];
+  const touch=(a,b)=>magPts(a).some(m=>magPts(b).some(t=>dist(m,t)<.5)||magSegs(b).some(([x,y])=>segDist(m,x,y).d<.5))||magPts(b).some(m=>magSegs(a).some(([x,y])=>segDist(m,x,y).d<.5));
+  while(st.length){const c=st.pop();vis.forEach(o=>{if(!out.has(o.id)&&touch(c,o)){out.add(o.id);st.push(o)}})}return[...out]}
+function moveWithMagnet(d,w,noMag){const p=snapPoint(w),dx=p.x-d.start.x,dy=p.y-d.start.y;
+  d.list.forEach((e,i)=>{const o=JSON.parse(JSON.stringify(d.orig[i]));Object.keys(o).forEach(k=>e[k]=o[k]);translate(e,dx,dy)});magHint=null;if(noMag)return;
+  const ids=new Set(d.list.map(e=>e.id)),tol=14/view.s,others=S.ents.filter(e=>!ids.has(e.id)&&layerVis(e.layer)&&e.type!='dim'&&e.type!='text');
+  let best={d:tol,v:null,at:null};const mp=[];d.list.forEach(e=>mp.push(...magPts(e)));
+  others.forEach(o=>{magPts(o).forEach(t=>mp.forEach(m=>{const dd=dist(m,t);if(dd<best.d)best={d:dd*0.6,v:{x:t.x-m.x,y:t.y-m.y},at:t}}));
+    magSegs(o).forEach(([a,b])=>mp.forEach(m=>{const r=segDist(m,a,b);if(r.d<best.d){const q={x:a.x+(b.x-a.x)*r.t,y:a.y+(b.y-a.y)*r.t};best={d:r.d,v:{x:q.x-m.x,y:q.y-m.y},at:q}}}))});
+  if(best.v){d.list.forEach(e=>translate(e,best.v.x,best.v.y));magHint=best.at;$('sInfo').textContent='🧲 collé (Alt = sans aimant)'}}
+
 // ---------- Menu clic droit ----------
 const ENAME={wall:'Mur',line:'Ligne',rect:'Rectangle',circle:'Cercle',poly:'Polygone',room:'Pièce',door:'Porte',window:'Fenêtre',dim:'Cote',text:'Texte'};
 function ctxMenu(ev,sp){const w=S2W(sp);if(pts.length){DGMenu.show(ev.clientX,ev.clientY,[{icon:'✔',label:'Terminer le tracé',key:'Entrée',action:finish},{icon:'✕',label:'Annuler le tracé',key:'Échap',action:()=>{pts=[];draw()}}]);return}
@@ -455,7 +482,7 @@ function ctxMenu(ev,sp){const w=S2W(sp);if(pts.length){DGMenu.show(ev.clientX,ev
   const items=[];
   if(L.length){items.push({head:L.length>1?L.length+' éléments':(ENAME[one.type]||'Élément')+(one.name?' — '+one.name:'')},
     {icon:'🗑',label:L.length>1?'Supprimer les '+L.length+' éléments':'Supprimer',key:'Suppr',danger:true,action:deleteSel},
-    {icon:'✂',label:'Couper',key:'Ctrl+X',action:()=>{if(copySel2())deleteSel()}},{icon:'📋',label:'Copier',key:'Ctrl+C',action:copySel2},{icon:'⧉',label:'Dupliquer',key:'Ctrl+D',action:()=>{if(copySel2())paste2(null)}});
+    {icon:'✂',label:'Couper',key:'Ctrl+X',action:()=>{if(copySel2())deleteSel()}},{icon:'📋',label:'Copier',key:'Ctrl+C',action:copySel2},{icon:'⧉',label:'Dupliquer',key:'Ctrl+D',action:()=>{if(copySel2())paste2(null)}},{icon:'🧲',label:'Sélectionner les pièces reliées',action:()=>{const ids=linkedCluster(L);msel=ids;sel=null;if(msel.length==1){sel=msel[0];msel=[]}renderProps();draw();alertBox('🧲 '+ids.length+' pièce(s) reliée(s) sélectionnée(s) — glissez pour les déplacer ensemble')}});
     if(L.length>1&&!g)items.push({icon:'🧩',label:'Grouper',key:'Ctrl+G',action:groupSel});
     if(g)items.push({icon:'💥',label:'Dégrouper',action:()=>{snap0();L.forEach(e=>{delete e.grp;delete e.grpName});changed()}});
     if(S.layers.length>1)S.layers.filter(l=>l.id!=L[0].layer).forEach(l=>items.push({icon:'📑',label:'Envoyer vers « '+l.name+' »',action:()=>{snap0();L.forEach(e=>e.layer=l.id);msel=[];sel=null;changed()}}));
@@ -796,7 +823,7 @@ const aiBox=DGAssist.mount('2d',AITOOLS,drawingSummary,{'Sélection':tb('select'
 const WM=DGPanels.init('2d',$('main'),$('stage'),[{id:'tools',title:'Outils',el:$('tools'),dock:'left',w:64},{id:'side',title:'Propriétés',el:$('side'),dock:'right',w:300,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:300,weight:1},{id:'lia',title:'👩 Lia — votre assistante',el:aiBox,dock:'float',x:Math.max(80,innerWidth-310-360),y:Math.max(60,innerHeight-Math.min(470,innerHeight-110)-12),w:350,h:Math.min(470,innerHeight-110)}]);
 DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, exporter',['newB','openB','saveB','-','photoB','pngB','dxfB','dxfI','csvB','printB'],$('tbEnd'));
 const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['to3dB','winB','panelB'],$('tbEnd'));
-$('winB').onclick=()=>WM.menu(plusB);$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('panelB').onclick=()=>WM.toggleDock('right');
+$('winB').onclick=()=>WM.menu(plusB);applyNiveau();$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('panelB').onclick=()=>WM.toggleDock('right');
 setMode(S.mode);renderCfg();resize();S.ents.forEach(e=>{if(e.id>=nid)nid=e.id+1});
 if(!S.ents.length)exampleHouse();else fit();renderProps();
 </script>

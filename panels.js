@@ -65,7 +65,7 @@ const DGPanels={
           const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up);save();fire()};addEventListener('pointermove',mv);addEventListener('pointerup',up)}});
       Object.values(P).filter(p=>p.mode=='float'&&!p.hidden).forEach(p=>{const w=p.win;w.className='dgp float'+(p.min?' min':'')+(p.w<130?' narrow':'');
         if(!p.min){p.h=Math.min(p.h,innerHeight-60);p.y=Math.min(p.y,innerHeight-p.h-6)}w.style.cssText=`left:${Math.min(Math.max(0,p.x),innerWidth-80)}px;top:${Math.min(Math.max(0,p.y),innerHeight-40)}px;width:${p.w}px;${p.min?'':'height:'+p.h+'px;'}z-index:${++z}`;if(w.parentNode!==document.body)document.body.append(w)});
-      Object.values(P).filter(p=>p.hidden).forEach(p=>p.win.remove());save();fire()}
+      Object.values(P).filter(p=>p.hidden).forEach(p=>{p.win.className='dgp';p.win.style.cssText='display:none';if(p.win.parentNode!==document.body)document.body.append(p.win)});save();fire()}
     layout();
     const api={layout,
       menu(btn){const old=document.querySelector('.dgmenu');if(old){old.remove();return}const m=document.createElement('div');m.className='dgmenu';const r=btn.getBoundingClientRect();
