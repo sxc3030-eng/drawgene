@@ -71,8 +71,13 @@ window.DGAssist={
       log.append(d,s)}
     function showCfg(){const c=cfg();cfgBox.hidden=!cfgBox.hidden;if(cfgBox.hidden)return;
       cfgBox.innerHTML=`<label>Clé API Claude (reste sur cet ordinateur)<input class="ck" type="password" placeholder="sk-ant-…"></label><label>Modèle Claude<select class="cm"><option value="claude-opus-5-5">Claude Opus 5.5 — le meilleur pour lire les plans</option><option value="claude-sonnet-5-5">Claude Sonnet 5.5 — plus économique</option><option value="claude-haiku-5-5">Claude Haiku 5.5 — très économique</option></select></label>
-<button class="sv">Enregistrer</button>`;
+<button class="sv">Enregistrer</button>
+<div class="help"><b>📧 Brancher Claude sur un autre ordinateur</b><br>Envoie un lien : la personne clique dessus et Claude est branché chez elle avec la clé ci-dessus.<label style="display:block;margin-top:6px">Courriel<input class="em" type="email" placeholder="papa@exemple.com"></label><button class="big ml">📧 Envoyer le lien par courriel</button><button class="big cp" style="background:#2f333c">📋 Copier le lien</button></div>`;
       cfgBox.querySelector('.ck').value=c.claudeKey;cfgBox.querySelector('.cm').value=c.claudeModel;
+      const lien=()=>{const k=cfgBox.querySelector('.ck').value.trim();if(!/^sk-ant-/.test(k)){alert('Collez d\'abord une clé qui commence par sk-ant-');return null}return location.origin+location.pathname.replace(/[^/]*$/,'')+'plan.html#cle='+k};
+      cfgBox.querySelector('.ml').onclick=()=>{const l=lien();if(!l)return;const to=cfgBox.querySelector('.em').value.trim();
+        location.href='mailto:'+encodeURIComponent(to)+'?subject='+encodeURIComponent('drawGene : brancher Claude sur ton ordinateur')+'&body='+encodeURIComponent('Bonjour,\n\nSur ton ordinateur, ouvre ce lien une seule fois (avec Chrome ou Edge) :\n\n'+l+'\n\nTu verras « Claude est branché sur cet ordinateur ». C\'est tout ! Ensuite clique sur ✳ Claude dans drawGene.\n\nAprès, tu peux effacer ce courriel.')};
+      cfgBox.querySelector('.cp').onclick=()=>{const l=lien();if(!l)return;(navigator.clipboard?navigator.clipboard.writeText(l):Promise.reject()).then(()=>alert('Lien copié. Collez-le dans un courriel ou un texto.'),()=>prompt('Copiez ce lien :',l))};
       cfgBox.querySelector('.sv').onclick=()=>{saveCfg({claudeKey:cfgBox.querySelector('.ck').value.trim(),claudeModel:cfgBox.querySelector('.cm').value});cfgBox.hidden=true;detect().then(()=>{if(!hist.length)welcome()})}}
     $q('.cf').onclick=showCfg;$q('.cl').onclick=()=>{hist=[];chist=[];pend=[];showAtt();if('speechSynthesis' in window)speechSynthesis.cancel();welcome()};
     // ---- conversation ----
