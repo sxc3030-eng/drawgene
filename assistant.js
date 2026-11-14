@@ -79,8 +79,13 @@ window.DGAssist={
       d.textContent='Bonjour, je suis Lia ! Que voulez-vous faire ? Je peux le faire pour vous, ou vous montrer comment. Donnez-moi aussi un plan Inventor en PDF ou une photo avec 📎 : je lis les cotes et je le redessine.';
       const s=document.createElement('div');s.className='sugg';SUG.forEach(x=>{const b=document.createElement('button');b.textContent=x;b.onclick=()=>{ta.value=x;send()};s.append(b)});
       if(!engine){const h=document.createElement('div');h.className='help';
-        h.innerHTML='<b>🔌 Brancher Lia (une seule fois)</b><br>Ouvrez le lien reçu par courriel, ou collez le jeton SouverainCode ici :<input class="k" type="password" placeholder="jeton" style="width:100%;margin-top:6px;background:#0f1115;border:1px solid #363a44;border-radius:6px;color:#e6e7ea;padding:5px"><button class="big">🔌 Brancher</button>';
-        h.querySelector('.big').onclick=()=>{const k=h.querySelector('.k').value.trim();if(k.length<24){alert('Jeton trop court.');return}saveCfg({souvJeton:k});detect().then(welcome)};log.append(h)}
+        h.innerHTML='<b>🔌 Brancher Lia (une seule fois)</b><br>Tapez le <b>code à 6 chiffres</b> qu\'on vous a donné :<input class="k" inputmode="numeric" autocomplete="off" placeholder="ex. 482913" style="width:100%;margin-top:6px;background:#0f1115;border:1px solid #363a44;border-radius:6px;color:#e6e7ea;padding:8px;font:600 18px ui-monospace,monospace;letter-spacing:.2em;text-align:center"><button class="big">🔌 Brancher</button><div class="rm" style="margin-top:6px"></div>';
+        const kk=h.querySelector('.k'),rm=h.querySelector('.rm');kk.onkeydown=e=>{e.stopPropagation();if(e.key=='Enter')h.querySelector('.big').click()};
+        h.querySelector('.big').onclick=async()=>{const k=kk.value.trim();if(k.length>=24){saveCfg({souvJeton:k});detect().then(welcome);return}
+          const code=k.replace(/\D/g,'');if(code.length<6){rm.textContent='Le code a 6 chiffres.';return}rm.textContent='Je me branche…';
+          try{const r=await fetch(cfg().souvUrl+'/api/drawgene/jumeler',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code})});const j=await r.json().catch(()=>({}));
+            if(!r.ok){rm.textContent='⚠ '+(j.message||'Erreur '+r.status);return}saveCfg({souvJeton:j.jeton});await detect();welcome();const m='Voilà, je suis branchée ! Que puis-je faire pour vous ?';add('a',m);say(m)}
+          catch(e){rm.textContent='⚠ Pas de connexion internet ?'}};log.append(h)}
       log.append(d,s)}
     function showCfg(){const c=cfg();cfgBox.hidden=!cfgBox.hidden;if(cfgBox.hidden)return;
       cfgBox.innerHTML=`<b>SouverainCode (ton serveur)</b><label>Adresse<input class="su"></label><label>Jeton drawGene (reste sur cet ordinateur)<input class="sj" type="password"></label><button class="ts">🔎 Vérifier la connexion</button>
