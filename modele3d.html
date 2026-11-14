@@ -47,7 +47,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Claude, votre assistant">✳ Claude</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v25</small></b>
+  <button id="aiB" class="lia" title="Votre assistant (SouverainCode)">🤖 Assistant</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v26</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a><select id="unit3" style="width:auto" title="Unités des cotes"></select>
   <span id="tbCreate"></span><button id="fExt" data-add="extrude">⬆ Extrusion</button>
   <button id="fRev" data-add="revolve">🔄 Révolution</button>
@@ -853,7 +853,7 @@ const libBox=DGLib.mount(document.body,'3d',R.domElement,insert3D,{embedded:true
 const aiBox=DGAssist.mount('3d',AITOOLS,modelSummary,{'Menu Créer (Extrusion, Révolution, Trou, Enlèvement)':'.dgmb','Bois':'#woodB','Contrainte':'#consB','Liste de coupe':'#cutlB',
   'Annuler':'#undoB','Rétablir':'#redoB','Supprimer':'#delSel','Menu Fichier (Nouveau, Ouvrir, Enregistrer, importer, exporter)':'.dgmb','Retour au plan 2D':'a[href="plan.html"] button',
   'Vues (Iso, Face, Dessus)':'#vbtn','Mesurer':'#measB','Sélection par zone':'#boxB','Déplacer / Tourner':'#tmB','Vue en coupe':'#secB','Arbre du modèle':'#tree','Paramètres':'#props','Bibliothèque':'.dglib'});
-const WM=DGPanels.init('3d',$('main'),view,[{id:'tree',title:'Arbre du modèle',el:$('tree'),dock:'left',w:230},{id:'props',title:'Paramètres',el:$('props'),dock:'right',w:290,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:290,weight:1},{id:'lia',title:'✳ Claude — votre assistant',el:aiBox,hideMin:true,dock:'float',x:Math.max(80,innerWidth-310-360),y:Math.max(60,innerHeight-Math.min(470,innerHeight-110)-12),w:350,h:Math.min(470,innerHeight-110)}]);
+const WM=DGPanels.init('3d',$('main'),view,[{id:'tree',title:'Arbre du modèle',el:$('tree'),dock:'left',w:230},{id:'props',title:'Paramètres',el:$('props'),dock:'right',w:290,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:290,weight:1},{id:'lia',title:'🤖 Assistant — SouverainCode',el:aiBox,hideMin:true,dock:'float',x:Math.max(80,innerWidth-310-360),y:Math.max(60,innerHeight-Math.min(470,innerHeight-110)-12),w:350,h:Math.min(470,innerHeight-110)}]);
 $('exBr').onclick=()=>{if(bodies().length&&!confirm('Remplacer le modèle actuel par la bride exemple ?'))return;snap();example();sel=null;rebuild();fitView()};
 $('exCh').onclick=()=>{if(bodies().length&&!confirm('Remplacer le modèle actuel par la charpente exemple ?'))return;fetch('exemples/charpente-4-murs.drawgene').then(r=>r.text()).then(t=>openText(t,'Charpente 4 murs.drawgene')).catch(()=>alert('Exemple indisponible hors ligne la première fois.'))};
 DGMenu.group('✏ Créer ▾','Extrusion, révolution, trou, enlèvement',['fExt','fRev','fHole','fCut'],$('tbCreate'));
