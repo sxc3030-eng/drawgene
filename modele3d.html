@@ -47,14 +47,14 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v28</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v29</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a><select id="unit3" style="width:auto" title="Unités des cotes"></select>
   <span id="tbCreate"></span><button id="fExt" data-add="extrude">⬆ Extrusion</button>
   <button id="fRev" data-add="revolve">🔄 Révolution</button>
   <button id="fHole" data-add="hole">🕳 Trou</button>
   <button id="fCut" data-add="cut">✂ Enlèvement</button>
   <span class="sep"></span>
-  <button id="woodB">🪵 Bois</button><button id="consB">🔗 Contrainte</button><button id="cutlB">📋 Liste de coupe</button><button id="lockAll">🔓 Assemblage</button>
+  <button id="woodB">🪵 Bois</button><button id="consB">🔗 Contrainte</button><button id="cutlB">📋 Liste de coupe</button><button id="lockAll">🔓 Assemblage</button><button id="colB">🎨 Couleurs par pièce</button>
   <span class="sep"></span>
   <button id="repB">🩺 Rapport de problème</button><button id="sugB">💡 Suggestions de la suite (activer / désactiver)</button><button id="exBr">⚙️ Exemple : bride en acier</button><button id="exCh">🪵 Exemple : charpente 4 murs</button><button id="houseB">🏠 Maison 3D depuis le plan</button>
   <button id="undoB" title="Annuler (Ctrl+Z)">↶</button><button id="redoB" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
@@ -161,6 +161,12 @@ const selCon=()=>typeof sel=='string'&&sel[0]=='k'?cons().find(k=>k.id==+sel.sli
 let selSet=[];// sélection multiple (Ctrl+clic) : ids de composants racines
 const D2R=Math.PI/180;
 const rootOf=c=>{while(c&&c.parent!=null&&compOf(c.parent))c=compOf(c.parent);return c};
+// Couleurs des pièces : chaque pièce de l'assemblage a sa couleur (auto), ou celle choisie au clic droit
+const PAL=[['Rouge',0xe5484d],['Orange',0xf5862b],['Jaune',0xf2c53d],['Vert',0x46a758],['Turquoise',0x12a594],['Bleu',0x3e8ef7],['Indigo',0x6e56cf],['Rose',0xe93d82],['Brun',0x9c6b3c],['Gris',0x8b8d98],['Blanc',0xeeeeee],['Noir',0x333333]];
+function pieceCol(f){const C=f.comp&&compOf(f.comp);if(!C)return COLORS[f.mat]||0xaaaaaa;if(C.color!=null)return C.color;const T=rootOf(C);if(T.color!=null)return T.color;
+  if(M.colAuto===false)return COLORS[f.mat]||0xaaaaaa;const roots=comps().filter(c=>rootOf(c)===c);return PAL[Math.max(0,roots.indexOf(T))%10][1]}
+function colorMenu(e,C){DGMenu.show(e.clientX,e.clientY,[{head:'🎨 Couleur de « '+C.name+' »'},...PAL.map(([n,v])=>({icon:'●',label:n,action:()=>{snap();C.color=v;rebuild()}})),'-',{icon:'↺',label:'Couleur automatique',action:()=>{snap();delete C.color;rebuild()}}]);
+  setTimeout(()=>{const m=document.querySelector('.dgcm');if(m)[...m.querySelectorAll('.it')].slice(0,PAL.length).forEach((it,i)=>it.querySelector('.ic').style.color='#'+PAL[i][1].toString(16).padStart(6,'0'))},0)}
 const kids=c=>comps().filter(x=>x.parent==c.id);
 const descIds=c=>{const out=[c.id];kids(c).forEach(k=>out.push(...descIds(k)));return out};
 const isLocked=c=>{if(M.locked)return true;while(c){if(c.locked)return true;c=c.parent!=null?compOf(c.parent):null}return false};
@@ -184,7 +190,7 @@ function rebuild(){solveCons();group.clear();if(handles){scene.remove(handles);h
   const sc=selComp(),hi=new Set();if(sc)descIds(sc).forEach(i=>hi.add(i));selSet.forEach(id=>{const c=compOf(id);if(c)descIds(c).forEach(i=>hi.add(i))});
   bodies().forEach(f=>{if(!f.on)return;const tgt=f.comp&&CG[f.comp]?CG[f.comp]:group;let g;try{g=buildGeom(f)}catch(e){g=null}if(!g){info.push(f.name+' : profil invalide');return}
     const selF=fid(sel),isSel=sel==f.id||(selF&&selF.parent==f.id)||hi.has(f.comp);
-    const mat=new THREE.MeshStandardMaterial({color:COLORS[f.mat]||0xaaaaaa,metalness:['bois','pvc','acrylique','beton'].includes(f.mat)?0:.55,roughness:.45,wireframe:wire,emissive:isSel?0x3d5fa0:0,transparent:f.mat=='acrylique',opacity:f.mat=='acrylique'?.6:1,side:THREE.DoubleSide,clippingPlanes:secOn?[secPlane]:null});
+    const mat=new THREE.MeshStandardMaterial({color:pieceCol(f),metalness:['bois','pvc','acrylique','beton'].includes(f.mat)?0:.55,roughness:.45,wireframe:wire,emissive:isSel?0x3d5fa0:0,transparent:f.mat=='acrylique',opacity:f.mat=='acrylique'?.6:1,side:THREE.DoubleSide,clippingPlanes:secOn?[secPlane]:null});
     const m=new THREE.Mesh(g,mat);m.userData.id=f.id;m.userData.comp=f.comp||null;tgt.add(m);
     if(edges&&!wire)tgt.add(new THREE.LineSegments(new THREE.EdgesGeometry(g,25),new THREE.LineBasicMaterial({color:isSel?0xffb020:0x111111,clippingPlanes:secOn?[secPlane]:null})));
     const v=volume(g),kg=v*1e-9*DENS[f.mat]*(f.qty||1);f._v=v;f._a=area(g);f._kg=v*1e-9*DENS[f.mat];g.computeBoundingBox();f._bb=g.boundingBox;tot.kg+=kg;tot.vol+=v*(f.qty||1);tot.n+=f.qty||1});
@@ -560,6 +566,7 @@ function ctx3(e){const r=R.domElement.getBoundingClientRect();ray.setFromCamera(
       {icon:'✏',label:'Modifier les cotes',action:()=>{sel=f.id;selSet=[];rebuild()}},
       {icon:'🧲',label:'Sélectionner les pièces collées',action:()=>{const ids=touchingCluster(RT);if(ids.length==1){sel='c'+ids[0];selSet=[]}else{selSet=ids;sel='multi'}rebuild();$('info').textContent='🧲 '+ids.length+' pièce(s) collée(s) sélectionnée(s) — glissez pour les déplacer ensemble'}},
       {icon:'✥',label:'Sélectionner'+(RT!==C?' cette pièce seule':''),action:()=>{sel='c'+C.id;selSet=[];rebuild()}},
+      {icon:'🎨',label:'Couleur…',action:()=>colorMenu(e,C)},
       {icon:'↻',label:'Tourner 90°',key:'Alt+→',disabled:lk,action:()=>{snap();RT.ry=((RT.ry||0)+90)%360;rebuild()}},
       {icon:'⤓',label:'Poser au sol',disabled:lk,action:()=>{snap();groundComp(RT);rebuild()}},
       {icon:'🔗',label:'Contrainte depuis cette face',disabled:lk||!h[0].face,action:()=>{startCons();consFace(h[0])}},
@@ -693,7 +700,7 @@ addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)
     const st=(M.step||1)*(e.shiftKey?10:1);snap();roots.forEach(r=>{if(e.altKey&&mv[1]==0){r.ry=((r.ry||0)+(mv[0]+mv[2]>0?90:-90)+360)%360}else{r.x=(r.x||0)+mv[0]*st;r.y=(r.y||0)+mv[1]*st;r.z=(r.z||0)+mv[2]*st}});rebuild()}});
 function setTM(m){tc.setMode(m);$('tmB').textContent=m=='rotate'?'⟳ Tourner':'✥ Déplacer'}
 $('tmB').onclick=()=>setTM(tc.getMode()=='translate'?'rotate':'translate');
-$('lockAll').onclick=()=>{snap();M.locked=!M.locked;rebuild()};$('unlB').onclick=unlockAll;
+$('lockAll').onclick=()=>{snap();M.locked=!M.locked;rebuild()};$('colB').onclick=()=>{M.colAuto=M.colAuto===false;rebuild();$('info').textContent=M.colAuto===false?'🎨 Couleurs du matériau':'🎨 Une couleur par pièce'};$('unlB').onclick=unlockAll;
 // ---------- Vue en coupe ----------
 function updSec(){const b=bbox(),ax=$('secA').value.toLowerCase(),t=+$('secR').value/1000,v=b.min[ax]+(b.max[ax]-b.min[ax])*t,n=new THREE.Vector3(ax=='x'?1:0,ax=='y'?1:0,ax=='z'?1:0);
   secPlane.setFromNormalAndCoplanarPoint(secFlip?n:n.clone().negate(),new THREE.Vector3(ax=='x'?v:0,ax=='y'?v:0,ax=='z'?v:0))}
@@ -837,6 +844,8 @@ const AITOOLS=[
     Object.entries(sheets).forEach(([t,p])=>out.push(`${t} : ${p.length} morceau(x)`));$('cutlB').click();return out.join('\n')||'aucun bois dans le modèle'}},
  {name:'dossier_complet',label:'Dossier complet',description:'Ouvre le dossier complet imprimable : vue 3D, nomenclature et liste d\'achat.',parameters:{type:'object',properties:{}},run:()=>{openDossier3D();return'dossier ouvert'}},
  {name:'liste_achat',label:'Liste d\'achat',description:'Liste d\'achat du modèle : planches par longueur, feuilles 4x8, métal, prix.',parameters:{type:'object',properties:{}},run:()=>{const pl=purchase3D();return pl.rows.map(r=>r.art+' : '+r.q+' '+r.u).join('\n')+'\nTotal : '+pl.total.toFixed(0)+' $'}},
+ {name:'colorer',label:'Colorer',description:'Change la couleur d\'une pièce (par son nom, ou la sélection si nom vide).',parameters:{type:'object',properties:{nom:{type:'string'},couleur:{type:'string',enum:PAL.map(p=>p[0].toLowerCase())}},required:['couleur']},
+  run:a=>{const P=PAL.find(p=>p[0].toLowerCase()==String(a.couleur).toLowerCase());if(!P)return'couleur inconnue';const L=a.nom?byName(a.nom):(selSet.length?selSet.map(compOf):[selComp()]).filter(Boolean);if(!L.length)return'aucune pièce trouvée';snap();L.forEach(c=>c.color=P[1]);rebuild();return L.length+' pièce(s) en '+P[0].toLowerCase()}},
  {name:'decrire_modele',label:'Lire le modèle',description:'Donne la liste détaillée des pièces, dimensions, positions et masses.',parameters:{type:'object',properties:{}},run:()=>modelSummary()},
  {name:'annuler',label:'Annuler',description:'Annule la dernière action.',parameters:{type:'object',properties:{}},run:()=>{$('undoB').click();return'annulé'}}];
 
@@ -858,7 +867,7 @@ $('exBr').onclick=()=>{if(bodies().length&&!confirm('Remplacer le modèle actuel
 $('exCh').onclick=()=>{if(bodies().length&&!confirm('Remplacer le modèle actuel par la charpente exemple ?'))return;fetch('exemples/charpente-4-murs.drawgene').then(r=>r.text()).then(t=>openText(t,'Charpente 4 murs.drawgene')).catch(()=>alert('Exemple indisponible hors ligne la première fois.'))};
 DGMenu.group('✏ Créer ▾','Extrusion, révolution, trou, enlèvement',['fExt','fRev','fHole','fCut'],$('tbCreate'));
 DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, importer, exporter',['newB','openB','saveB','-','dosB','impB','stlB','objB','pngB'],$('tbEnd'));
-const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['repB','sugB','exCh','exBr','houseB','lockAll','winB','treeT','propT'],$('tbEnd'));
+const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['repB','sugB','exCh','exBr','houseB','lockAll','colB','winB','treeT','propT'],$('tbEnd'));
 $('winB').onclick=()=>WM.menu(plusB);applyNiveau();$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('treeT').onclick=()=>WM.toggleDock('left');$('propT').onclick=()=>WM.toggleDock('right');
 resize();if(/[?&]plan=1/.test(location.search)&&buildHouse(readPlan())){M.showPlan=true}syncPlan(true);
 </script>
