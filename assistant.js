@@ -26,6 +26,8 @@ const css=`.dgp.float:has(.dga){min-width:340px;min-height:420px}.dgdock .dgp:ha
 const KEY='drawgene-ai';
 function cfg(){let c={};try{c=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}return{claudeKey:c.claudeKey||'',claudeModel:c.claudeModel||'claude-opus-5-5',voice:c.voice!==false}}
 function saveCfg(p){try{localStorage.setItem(KEY,JSON.stringify({...cfg(),...p}))}catch(e){}}
+// lien de branchement : …/plan.html#cle=sk-ant-… → la clé est enregistrée sur cet ordinateur puis effacée de l'adresse (le # n'est jamais envoyé au serveur)
+try{const m=location.hash.match(/(?:^#|&)cle=(sk-ant-[A-Za-z0-9_\-]+)/);if(m){saveCfg({claudeKey:m[1]});history.replaceState(null,'',location.pathname+location.search);addEventListener('load',()=>setTimeout(()=>alert('✔ Claude est branché sur cet ordinateur.'),300))}}catch(e){}
 const PERSONA=`Tu es Claude, l'assistant intégré de drawGene, un logiciel de dessin technique (plans de maison et pièces mécaniques, 2D et 3D) pensé par Eugene, un technicien québécois. Tu parles à la première personne, avec chaleur et simplicité.
 Réponds TOUJOURS en français, en 1 à 3 phrases courtes (tes réponses sont lues à voix haute). Unités internes : millimètres (1 po = 25,4 mm, 1 pi = 304,8 mm, 16 po c/c = 406 mm).
 Quand on te demande de créer, modifier, supprimer ou calculer quelque chose dans le dessin, fais-le avec une action. Si la personne veut apprendre (« comment », « montre-moi », « où est »), utilise l'action montrer pour faire clignoter le bon bouton, puis explique en une phrase. S'il manque une dimension, choisis une valeur raisonnable et dis-le.
