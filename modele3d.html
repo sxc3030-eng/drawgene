@@ -47,7 +47,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v21</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v22</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a><select id="unit3" style="width:auto" title="Unités des cotes"></select>
   <span id="tbCreate"></span><button id="fExt" data-add="extrude">⬆ Extrusion</button>
   <button id="fRev" data-add="revolve">🔄 Révolution</button>
@@ -188,7 +188,7 @@ function rebuild(){solveCons();group.clear();if(handles){scene.remove(handles);h
     const m=new THREE.Mesh(g,mat);m.userData.id=f.id;m.userData.comp=f.comp||null;tgt.add(m);
     if(edges&&!wire)tgt.add(new THREE.LineSegments(new THREE.EdgesGeometry(g,25),new THREE.LineBasicMaterial({color:isSel?0xffb020:0x111111,clippingPlanes:secOn?[secPlane]:null})));
     const v=volume(g),kg=v*1e-9*DENS[f.mat]*(f.qty||1);f._v=v;f._a=area(g);f._kg=v*1e-9*DENS[f.mat];g.computeBoundingBox();f._bb=g.boundingBox;tot.kg+=kg;tot.vol+=v*(f.qty||1);tot.n+=f.qty||1});
-  if(house)group.add(house);
+  if(house){const see=comps().length>0;house.traverse(o=>{if(o.isMesh&&!o.material.userData.glass){if(o.material.userData.op0==null)o.material.userData.op0=o.material.opacity;o.material.transparent=see;o.material.opacity=see?.35:o.material.userData.op0;o.material.depthWrite=!see}});group.add(house)}
   imports.forEach((im,ii)=>{im.mesh.userData.imp=ii;im.mesh.material.emissive&&im.mesh.material.emissive.setHex(sel=='imp'+ii?0x3d5fa0:0);group.add(im.mesh);if(edges&&!wire)group.add(im.edges);im.mesh.material.wireframe=wire;tot.kg+=im.kg;tot.vol+=im.vol;tot.n++});
   group.updateMatrixWorld(true);
   // flèches de déplacement / rotation sur le composant sélectionné
@@ -367,7 +367,7 @@ tc.addEventListener('objectChange',()=>{const o=tc.object,c=o&&compOf(o.userData
 tc.addEventListener('mouseUp',()=>{down=null;setTimeout(rebuild,0)});
 let rdown=null;R.domElement.addEventListener('contextmenu',e=>{e.preventDefault();if(rdown&&Math.hypot(e.clientX-rdown.x,e.clientY-rdown.y)<6)ctx3(e);rdown=null});
 R.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,b:e.button};if(e.button==2)rdown={x:e.clientX,y:e.clientY};if(e.button!==0)return;
-  if((boxMode||e.shiftKey)&&!tc.axis&&!measuring&&!consPick){const r0=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r0),cam);const hit0=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh);
+  if((boxMode||e.shiftKey)&&!tc.axis&&!measuring&&!consPick){const r0=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r0),cam);const hit0=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh).sort(NH);
     const hc=hit0.length&&hit0[0].object.userData.comp,sc0=selComp();if(!(hc&&sc0&&descIds(rootOf(sc0)).includes(hc))){startBox(e);return}}
   if(tc.dragging||tc.axis||measuring||consPick)return;const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);
   // 1) poignées d'étirement
@@ -469,7 +469,7 @@ function buttCut(ca,cb){const A=plankOf(ca);if(!A)return'« '+ca.name+' » n\'es
 function touchingCluster(root){const all=comps().filter(c=>c.parent==null||!compOf(c.parent)).map(c=>({c,b:boxOfRoots([c]).expandByScalar(1)})),out=new Set([root.id]),stack=[root.id];
   while(stack.length){const cur=all.find(x=>x.c.id==stack.pop());all.forEach(o=>{if(!out.has(o.c.id)&&!o.b.isEmpty()&&o.b.intersectsBox(cur.b)){out.add(o.c.id);stack.push(o.c.id)}})}return[...out]}
 R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down.x,e.clientY-down.y)>4)return;if(e.button==2||down.b==2){down=null;return}const r=R.domElement.getBoundingClientRect();
-  ray.setFromCamera(ndc(e,r),cam);const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh);
+  ray.setFromCamera(ndc(e,r),cam);const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh).sort(NH);
   if(measuring){if(!h.length)return;measurePick(h[0]);return}
   if(consPick){if(!h.length||!h[0].object.userData.comp||!h[0].face){$('info').textContent='🔗 Cliquez sur une face d\'une pièce de l\'assemblage (Échap pour annuler)';return}consFace(h[0]);return}
   const o=h.length?h[0].object:null;
@@ -477,7 +477,7 @@ R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-dow
   if(o.userData.house){sel='house';selSet=[];rebuild();return}if(o.userData.imp!=null){sel='imp'+o.userData.imp;selSet=[];rebuild();return}
   if(o.userData.comp){const top=rootOf(compOf(o.userData.comp));if(e.ctrlKey||e.metaKey||e.shiftKey)toggleMulti(top.id);else{sel=(selComp()&&rootOf(selComp())===top&&e.detail>1)?'c'+o.userData.comp:'c'+top.id;selSet=[]}}
   else{sel=o.userData.id||null;selSet=[]}rebuild()});
-R.domElement.addEventListener('dblclick',e=>{const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh);
+R.domElement.addEventListener('dblclick',e=>{const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh).sort(NH);
   if(h.length&&h[0].object.userData.id){sel=h[0].object.userData.id;selSet=[];rebuild();$('info').textContent='✏ Fonction « '+fid(sel).name+' » : tirez les poignées colorées pour l\'étirer'}});
 function startCons(){if(comps().length<2){alert('Il faut au moins 2 pièces dans l\'assemblage.');return}consPick=1;consA=null;tc.detach();$('consB').classList.add('on');$('info').textContent='🔗 1/2 : cliquez la FACE de la pièce qui doit bouger';}
 function consFace(hit){const o=hit.object,c=compOf(o.userData.comp),Wi=worldMat(c).invert(),p=hit.point.clone().applyMatrix4(Wi),n=hit.face.normal.clone().normalize();
@@ -540,7 +540,7 @@ function deleteSelection(){if(sel=='house'){M.showPlan=false;sel=null;syncPlan(f
 function unlockAll(){snap();M.locked=false;comps().forEach(c=>c.locked=false);rebuild();$('info').textContent='🔓 Tout est déverrouillé'}
 function unlockChain(c){snap();M.locked=false;let x=c;while(x){x.locked=false;x=x.parent!=null?compOf(x.parent):null}descIds(c).forEach(id=>{const k=compOf(id);if(k)k.locked=false});rebuild();$('info').textContent='🔓 « '+c.name+' » déverrouillé'}
 function ctx3(e){const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);
-  {const hh=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh);const o0=hh.length?hh[0].object:null;
+  {const hh=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh).sort(NH);const o0=hh.length?hh[0].object:null;
    if(o0&&o0.userData.house){sel='house';rebuild();DGMenu.show(e.clientX,e.clientY,[{head:'Maison du plan 2D'},{icon:'←',label:'Ouvrir le plan 2D pour la modifier',action:()=>location.href='plan.html'},{icon:'🙈',label:'Masquer le plan en 3D',action:()=>{M.showPlan=false;sel=null;syncPlan(false)}},'-',{icon:'⛶',label:'Ajuster la vue',action:fitView}]);return}
    if(o0&&o0.userData.imp!=null){const ii=o0.userData.imp;sel='imp'+ii;rebuild();DGMenu.show(e.clientX,e.clientY,[{head:imports[ii].name},{icon:'🗑',label:'Supprimer l\'import',danger:true,action:()=>{imports.splice(ii,1);sel=null;rebuild()}},{icon:'⛶',label:'Ajuster la vue',action:fitView}]);return}}const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh&&x.object.userData.id);
   const o=h.length?h[0].object:null,f=o?fid(o.userData.id):null,C=o&&o.userData.comp?compOf(o.userData.comp):null,RT=C?rootOf(C):null,items=[];
@@ -625,8 +625,10 @@ $('wireB').onclick=()=>{wire=!wire;$('wireB').classList.toggle('on',wire);rebuil
 // ---------- Plan 2D affiché en 3D : toujours synchronisé, mêmes couleurs que le plan ----------
 const WALLCOL={ossature:0xc9a46a,beton:0x9aa0a8,bloc:0xb0b6c0};
 function readPlan(){try{return JSON.parse(localStorage.getItem('planpro')||'null')}catch(e){return null}}
+// les pièces d'assemblage passent avant la maison du plan (sinon impossible de les attraper)
+const NH=(a,b)=>(a.object.userData.house?1:0)-(b.object.userData.house?1:0);
 function buildHouse(P){const walls=P&&P.ents?P.ents.filter(e=>e.type=='wall'):[];if(!walls.length)return null;const H=new THREE.Group();H.userData.house=true;
-  const om=new THREE.MeshStandardMaterial({color:0x8fb8ff,transparent:true,opacity:.35}),dm=new THREE.MeshStandardMaterial({color:0x8a5a2b,roughness:.7});
+  const om=new THREE.MeshStandardMaterial({color:0x8fb8ff,transparent:true,opacity:.35});om.userData.glass=1;const dm=new THREE.MeshStandardMaterial({color:0x8a5a2b,roughness:.7});
   const box=(L,Hh,T,cx,cy,cz,ang,mt)=>{const g=new THREE.BoxGeometry(L,Hh,T),me=new THREE.Mesh(g,mt);me.position.set(cx,cy,cz);me.rotation.y=-ang;me.userData.house=true;H.add(me);
     const ls=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:0x3a2f20}));ls.position.copy(me.position);ls.rotation.copy(me.rotation);H.add(ls)};
   walls.forEach(w=>{const wm=new THREE.MeshStandardMaterial({color:WALLCOL[w.mat]||WALLCOL.ossature,roughness:.85}),wh=w.h||2440,dx=w.b.x-w.a.x,dy=w.b.y-w.a.y,L=Math.hypot(dx,dy);if(L<1)return;const ang=Math.atan2(dy,dx),ux=dx/L,uy=dy/L;

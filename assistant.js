@@ -1,6 +1,7 @@
 // drawGene — Lia, l'assistante IA intégrée.
 // Moteur 1 : intégré (Ministral / Mistral dans le navigateur via WebGPU, téléchargé une fois, puis hors ligne).
 // Moteur 2 : Ollama local s'il est présent (plus rapide). Rien ne quitte l'ordinateur.
+// Moteur 3 : Claude (Anthropic) avec une clé API gardée SEULEMENT sur cet ordinateur — lit aussi les PDF / images de plans (Inventor, AutoCAD).
 (function(){
 const WEBLLM='https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.85/+esm';
 const MODELS={'Ministral-3-3B-Instruct-2512-BF16-q4f16_1-MLC':'Ministral 3B (Mistral) — léger, ≈ 2 Go · conseillé','Mistral-7B-Instruct-v0.3-q4f16_1-MLC':'Mistral 7B — plus intelligent, ≈ 4 Go · PC puissant','Llama-3.2-3B-Instruct-q4f16_1-MLC':'Llama 3.2 3B — léger, ≈ 2 Go'};
@@ -25,9 +26,10 @@ const css=`.dgp.float:has(.dga){min-width:340px;min-height:420px}.dgdock .dgp:ha
 .dga .help{font-size:11.5px;line-height:1.5;color:#cfd3da;background:#1b1d23;border:1px solid #363a44;border-radius:8px;padding:8px}.dga .help a{color:#c9a8ff}
 .dga .big{display:block;width:100%;margin-top:8px;background:#7b4dff;border:0;color:#fff;border-radius:8px;padding:9px;font:600 13px system-ui;cursor:pointer}
 .dga .bar{height:8px;background:#1b1d23;border-radius:4px;overflow:hidden;margin-top:6px}.dga .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#7b4dff,#ff9ad5);transition:width .3s}
+.dga .att{display:flex;flex-wrap:wrap;gap:4px;padding:0 8px}.dga .att span{background:#3d8bff22;border:1px solid #3d8bff66;border-radius:10px;padding:2px 8px;font-size:11px;cursor:pointer}
 .dga .sugg{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.dga .sugg button{max-width:100%;white-space:normal;text-align:left;background:#1b1d23;border:1px solid #7b4dff88;color:#c9a8ff;border-radius:12px;padding:3px 9px;cursor:pointer;font:11.5px system-ui}`;
 const KEY='drawgene-ai';
-function cfg(){let c={};try{c=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}return{engine:c.engine||'auto',url:c.url||'http://localhost:11434',ollamaModel:c.ollamaModel||c.model||'mistral',webModel:c.webModel||DEF_MODEL,voice:c.voice!==false,ready:!!c.ready}}
+function cfg(){let c={};try{c=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}return{engine:c.engine||'auto',url:c.url||'http://localhost:11434',ollamaModel:c.ollamaModel||c.model||'mistral',webModel:c.webModel||DEF_MODEL,claudeKey:c.claudeKey||'',claudeModel:c.claudeModel||'claude-opus-5-5',voice:c.voice!==false,ready:!!c.ready}}
 function saveCfg(p){try{localStorage.setItem(KEY,JSON.stringify({...cfg(),...p}))}catch(e){}}
 const PERSONA=`Tu t'appelles Lia. Tu es l'assistante intégrée de drawGene, un logiciel de dessin technique (plans de maison et pièces mécaniques, 2D et 3D) pensé par Eugene, un technicien québécois. Tu parles à la première personne, au féminin ("je suis prête", "je l'ai ajouté"), avec chaleur et simplicité.
 Réponds TOUJOURS en français, en 1 à 3 phrases courtes (tes réponses sont lues à voix haute). Unités internes : millimètres (1 po = 25,4 mm, 1 pi = 304,8 mm, 16 po c/c = 406 mm).
@@ -43,9 +45,9 @@ window.DGAssist={
     const box=document.createElement('div');box.className='dga';
     box.innerHTML=`<div class="st"><span class="av">👩</span><span class="who"><b>Lia</b><span class="stt"><span class="dot"></span>…</span></span><button class="vo" title="Voix de Lia (lecture à voix haute)">🔊</button><button class="cf" title="Réglages de Lia">⚙</button><button class="cl" title="Nouvelle conversation">🧹</button></div>
 <div class="cfg" hidden></div><div class="log"></div>
-<div class="ft"><button class="mic" title="Parler à Lia (micro)">🎤</button><textarea placeholder="Écrivez à Lia… (Entrée pour envoyer)"></textarea><button class="send">➤</button></div>`;
+<div class="att"></div><div class="ft"><input type="file" class="fi" hidden multiple accept=".pdf,image/*,.csv,.txt,.xls,.xlsx"><button class="clip" title="Joindre un plan (PDF Inventor, photo, capture, liste de cotes) — avec Claude">📎</button><button class="mic" title="Parler à Lia (micro)">🎤</button><textarea placeholder="Écrivez à Lia… (Entrée pour envoyer)"></textarea><button class="send">➤</button></div>`;
     const $q=s=>box.querySelector(s),log=$q('.log'),ta=$q('textarea'),stt=$q('.stt'),cfgBox=$q('.cfg'),av=$q('.av');
-    let hist=[],busy=false,engine=null,web=null,webLoading=null;
+    let hist=[],chist=[],pend=[],busy=false,engine=null,web=null,webLoading=null;
     const setSt=(cls,txt)=>{stt.innerHTML='<span class="dot '+cls+'"></span>';stt.append(txt)};
     const add=(cls,txt)=>{const d=document.createElement('div');d.className='m '+cls;d.textContent=txt;log.append(d);log.scrollTop=log.scrollHeight;return d};
     // ---- voix ----
@@ -61,6 +63,8 @@ window.DGAssist={
     // ---- choix du moteur ----
     async function ollamaOk(){const c=cfg();try{const r=await fetch(c.url+'/api/tags',{signal:AbortSignal.timeout(2500)});const j=await r.json();return(j.models||[]).some(m=>m.name==c.ollamaModel||m.name.split(':')[0]==c.ollamaModel.split(':')[0])}catch(e){return false}}
     async function detect(){const c=cfg();setSt('wait','Je me prépare…');
+      if(c.claudeKey&&(c.engine=='auto'||c.engine=='claude')){engine='claude';setSt('ok','Prête · Claude (internet)');return}
+      if(c.engine=='claude'){engine=null;setSt('ko','Clé Claude manquante (⚙)');return}
       if(c.engine!='web'&&await ollamaOk()){engine='ollama';setSt('ok','Prête · '+c.ollamaModel+' (Ollama, sur cet ordinateur)');return}
       if(c.engine=='ollama'){engine=null;setSt('ko','Ollama introuvable');return}
       if(!navigator.gpu){engine=null;setSt('ko','Carte graphique (WebGPU) non disponible');return}
@@ -75,7 +79,7 @@ window.DGAssist={
     const SUG=app=='3d'?['Ajoute 8 montants 2x4 aux 16 po','Fais une plaque d\'acier 200 par 100 par 6 avec 4 trous de 10','Combien de planches dois-je acheter ?','Comment je verrouille une pièce ?']
       :['Dessine une pièce de 4 m par 3,5 m','Ajoute une chambre de 12 pi par 10 pi','Combien ça va coûter en matériaux ?','Comment je change une cote ?'];
     function welcome(){log.innerHTML='';const c=cfg(),d=document.createElement('div');d.className='m a';
-      d.textContent='Bonjour, je suis Lia ! Que voulez-vous faire ? Dites-le-moi : je peux le faire pour vous, ou vous montrer comment le faire. Je fonctionne sur votre ordinateur, sans internet.';
+      d.textContent='Bonjour, je suis Lia ! Que voulez-vous faire ? Dites-le-moi : je peux le faire pour vous, ou vous montrer comment le faire. '+(engine=='claude'?'Vous pouvez aussi me donner un plan Inventor en PDF ou une photo avec 📎 : je lis les cotes et je le redessine.':'Je fonctionne sur votre ordinateur, sans internet.');
       const s=document.createElement('div');s.className='sugg';SUG.forEach(x=>{const b=document.createElement('button');b.textContent=x;b.onclick=()=>{ta.value=x;send()};s.append(b)});
       if(engine=='web'&&!c.ready){const h=document.createElement('div');h.className='help';
         h.innerHTML='<b>Activer Lia sur cet ordinateur</b><br>Je dois me télécharger <b>une seule fois</b> (<span class="sz"></span>). Ensuite je fonctionne <b>sans internet</b>, gratuitement.<button class="big">👩 Activer Lia</button>';
@@ -84,15 +88,19 @@ window.DGAssist={
       if(!engine){const h=document.createElement('div');h.className='help';h.style.borderColor='#ffb020';
         h.innerHTML='<b>⚠ Je ne peux pas démarrer sur cet appareil</b><br>J\'ai besoin d\'une carte graphique compatible <b>WebGPU</b> : utilisez <b>Chrome</b> ou <b>Edge</b> à jour sur un ordinateur Windows/Mac récent.<br>Autre option : installer <a href="https://ollama.com/download" target="_blank" rel="noopener">Ollama</a> puis lancer <a href="installer-assistant.bat" download>installer-assistant.bat</a>, et redémarrer. <button class="big rt">🔄 Réessayer</button>';
         h.querySelector('.rt').onclick=()=>detect().then(welcome);log.prepend(h)}
+      if(engine!='claude'){const h=document.createElement('div');h.className='help';
+        h.innerHTML='<b>⚡ Option rapide : Claude</b><br>Collez une clé API Anthropic (commence par <code>sk-ant-</code>). Elle reste sur cet ordinateur seulement. Claude lit aussi les plans PDF d\'Inventor.<input class="k" type="password" placeholder="sk-ant-…" style="width:100%;margin-top:6px;background:#0f1115;border:1px solid #363a44;border-radius:6px;color:#e6e7ea;padding:5px"><button class="big">🔑 Brancher Claude</button>';
+        h.querySelector('.big').onclick=()=>{const k=h.querySelector('.k').value.trim();if(!/^sk-ant-/.test(k)){alert('La clé doit commencer par sk-ant-');return}saveCfg({claudeKey:k,engine:'auto'});detect().then(welcome)};log.append(h)}
       log.append(d,s)}
     function showCfg(){const c=cfg();cfgBox.hidden=!cfgBox.hidden;if(cfgBox.hidden)return;
-      cfgBox.innerHTML=`<label>Cerveau de Lia<select class="en"><option value="auto">Automatique (Ollama si présent, sinon intégré)</option><option value="web">Intégré à drawGene</option><option value="ollama">Ollama (installé à part)</option></select></label>
+      cfgBox.innerHTML=`<label>Cerveau de Lia<select class="en"><option value="auto">Automatique (Ollama si présent, sinon intégré)</option><option value="web">Intégré à drawGene</option><option value="ollama">Ollama (installé à part)</option><option value="claude">Claude (clé API, internet)</option></select></label>
+<label>Clé API Claude (reste sur cet ordinateur)<input class="ck" type="password" placeholder="sk-ant-…"></label><label>Modèle Claude<select class="cm"><option value="claude-opus-5-5">Claude Opus 5.5 — le meilleur pour lire les plans</option><option value="claude-sonnet-5-5">Claude Sonnet 5.5 — plus économique</option><option value="claude-haiku-5-5">Claude Haiku 5.5 — très économique</option></select></label>
 <label>Modèle intégré<select class="wm"></select></label><label>Modèle Ollama<input class="om"></label><label>Adresse d'Ollama<input class="u"></label><button class="sv">Enregistrer</button>`;
       const wm=cfgBox.querySelector('.wm');Object.entries(MODELS).forEach(([k,v])=>{const o=document.createElement('option');o.value=k;o.textContent=v;wm.append(o)});
-      cfgBox.querySelector('.en').value=c.engine;wm.value=c.webModel;cfgBox.querySelector('.om').value=c.ollamaModel;cfgBox.querySelector('.u').value=c.url;
-      cfgBox.querySelector('.sv').onclick=()=>{const nw=wm.value;saveCfg({engine:cfgBox.querySelector('.en').value,webModel:nw,ollamaModel:cfgBox.querySelector('.om').value.trim()||'mistral',url:cfgBox.querySelector('.u').value.trim().replace(/\/$/,''),...(nw!=c.webModel?{ready:false}:{})});
+      cfgBox.querySelector('.en').value=c.engine;wm.value=c.webModel;cfgBox.querySelector('.ck').value=c.claudeKey;cfgBox.querySelector('.cm').value=c.claudeModel;cfgBox.querySelector('.om').value=c.ollamaModel;cfgBox.querySelector('.u').value=c.url;
+      cfgBox.querySelector('.sv').onclick=()=>{const nw=wm.value;saveCfg({claudeKey:cfgBox.querySelector('.ck').value.trim(),claudeModel:cfgBox.querySelector('.cm').value,engine:cfgBox.querySelector('.en').value,webModel:nw,ollamaModel:cfgBox.querySelector('.om').value.trim()||'mistral',url:cfgBox.querySelector('.u').value.trim().replace(/\/$/,''),...(nw!=c.webModel?{ready:false}:{})});
         if(nw!=c.webModel){web=null;webLoading=null}cfgBox.hidden=true;detect().then(()=>{if(!hist.length)welcome()})}}
-    $q('.cf').onclick=showCfg;$q('.cl').onclick=()=>{hist=[];if('speechSynthesis' in window)speechSynthesis.cancel();welcome()};
+    $q('.cf').onclick=showCfg;$q('.cl').onclick=()=>{hist=[];chist=[];pend=[];showAtt();if('speechSynthesis' in window)speechSynthesis.cancel();welcome()};
     // ---- conversation ----
     const toolDefs=tools.map(t=>({type:'function',function:{name:t.name,description:t.description,parameters:t.parameters}}));
     const toolText=tools.map(t=>`- ${t.name} : ${t.description} Paramètres : ${JSON.stringify(Object.fromEntries(Object.entries(t.parameters.properties||{}).map(([k,v])=>[k,v.enum?v.enum.join('|'):v.type])))}`).join('\n');
@@ -116,13 +124,41 @@ window.DGAssist={
         hist.push({role:'assistant',content:txt});const act=parseAction(txt);const clean=txt.replace(act?act.raw:'@@','').replace(/```[\s\S]*?```/g,'').trim();
         if(!act){bub.textContent=clean||txt;say(clean||txt);return}
         if(clean)bub.textContent=clean;else bub.remove();const res=await runTool(act.name,act.args);hist.push({role:'user',content:'RÉSULTAT de '+act.name+' : '+res+'\nConfirme en une phrase courte.'})}}
-    async function send(){const q=ta.value.trim();if(!q||busy)return;if('speechSynthesis' in window)speechSynthesis.cancel();
+    // ---- Claude (API Anthropic) ----
+    const ctools=tools.map(t=>({name:t.name,description:t.description,input_schema:t.parameters}));
+    const CLAUDE_RULE=`\n\nTu es branchée sur Claude : tu peux enchaîner plusieurs actions de suite (une pièce à la fois) sans demander la permission. Quand on te donne un plan (PDF Inventor/AutoCAD, photo, capture, tableau de cotes) : 1) relève TOUTES les cotes utiles et dis en une phrase ce que tu as compris ; 2) redessine-le avec les actions, cotes en millimètres ; 3) dis ce qui manquait ou ce que tu as supposé. Ici tu peux répondre en plusieurs phrases si c'est un plan.`;
+    function claudeErr(st,j){const m=(j&&j.error&&j.error.message)||'';if(st==401)return'Clé Claude refusée : vérifiez-la dans ⚙.';if(st==429)return'Trop de demandes à Claude : attendez une minute.';if(st==529||st>=500)return'Claude est surchargé : réessayez dans un instant.';if(/credit|balance|billing/i.test(m))return'Plus de crédit sur le compte Claude (console.anthropic.com → Billing).';return'Claude : '+(m||'erreur '+st)}
+    async function turnClaude(){const c=cfg();
+      for(let round=0;round<15;round++){const bub=add('a','…');
+        const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':c.claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','anthropic-beta':'server-side-fallback-2026-07-01'},
+          body:JSON.stringify({model:c.claudeModel,max_tokens:16000,fallbacks:'default',output_config:{effort:'medium'},system:PERSONA+CLAUDE_RULE+'\n\nÉtat actuel du dessin :\n'+context(),tools:ctools,messages:chist})});
+        const j=await r.json().catch(()=>({}));if(!r.ok){bub.remove();chist=[];throw new Error(claudeErr(r.status,j))}
+        if(j.stop_reason=='refusal'){bub.remove();chist=[];throw new Error('Claude a refusé cette demande. Reformulez-la.')}
+        chist.push({role:'assistant',content:j.content});
+        const txt=(j.content||[]).filter(b=>b.type=='text').map(b=>b.text).join('\n').trim();if(txt)bub.textContent=txt;else bub.remove();
+        const uses=(j.content||[]).filter(b=>b.type=='tool_use');
+        if(j.stop_reason!='tool_use'||!uses.length){say(txt);return}
+        const res=[];for(const u of uses)res.push({type:'tool_result',tool_use_id:u.id,content:await runTool(u.name,u.input)});chist.push({role:'user',content:res})}}
+    const attBox=$q('.att'),fi=$q('.fi');
+    function showAtt(){attBox.innerHTML='';pend.forEach((a,i)=>{const s=document.createElement('span');s.textContent='📎 '+a.name+' ✕';s.title='Retirer';s.onclick=()=>{pend.splice(i,1);showAtt()};attBox.append(s)})}
+    const b64=f=>new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]);r.onerror=ko;r.readAsDataURL(f)});
+    async function addFile(f){if(f.size>30e6){add('err',f.name+' : trop gros (max 30 Mo).');return}
+      if(f.type=='application/pdf'||/\.pdf$/i.test(f.name))pend.push({name:f.name,block:{type:'document',source:{type:'base64',media_type:'application/pdf',data:await b64(f)}}});
+      else if(/^image\/(png|jpeg|gif|webp)$/.test(f.type))pend.push({name:f.name,block:{type:'image',source:{type:'base64',media_type:f.type,data:await b64(f)}}});
+      else if(/\.(csv|txt)$/i.test(f.name))pend.push({name:f.name,block:{type:'text',text:'Fichier « '+f.name+' » :\n'+(await f.text()).slice(0,200000)}});
+      else{add('err',f.name+' : format non lu. Dans Inventor : Fichier → Exporter → PDF (ou faites une capture d\'écran). Pour Excel : enregistrer en CSV.');return}showAtt()}
+    $q('.clip').onclick=()=>{if(engine!='claude'){add('err','Pour lire un plan, branchez d\'abord Claude (clé API dans ⚙).');return}fi.click()};
+    fi.onchange=async()=>{for(const f of fi.files)await addFile(f);fi.value='';ta.focus()};
+    box.addEventListener('dragover',e=>e.preventDefault());box.addEventListener('drop',async e=>{if(!e.dataTransfer.files.length||engine!='claude')return;e.preventDefault();e.stopPropagation();for(const f of e.dataTransfer.files)await addFile(f)});
+    async function send(){let q=ta.value.trim();if(pend.length&&!q)q='Redessine ce plan dans drawGene avec toutes ses cotes.';if(!q||busy)return;if('speechSynthesis' in window)speechSynthesis.cancel();
       if(!engine){await detect();if(!engine){add('err','Je ne peux pas répondre sur cet appareil. Voir les instructions ci-dessus.');return}}
-      ta.value='';busy=true;add('u',q);hist.push({role:'user',content:q});
-      try{if(engine=='ollama')await turnOllama();else await turnWeb()}
-      catch(e){add('err','⚠ '+(e.name=='TypeError'&&engine=='ollama'?'Impossible de joindre Ollama. Est-il lancé ?':e.message))}
-      busy=false;if(hist.length>30)hist=hist.slice(-30)}
+      ta.value='';busy=true;add('u',q+(pend.length&&engine=='claude'?'\n📎 '+pend.map(a=>a.name).join(', '):''));hist.push({role:'user',content:q});
+      if(engine=='claude'){chist.push({role:'user',content:[...pend.map(a=>a.block),{type:'text',text:q}]});pend=[];showAtt()}
+      try{if(engine=='claude')await turnClaude();else if(engine=='ollama')await turnOllama();else await turnWeb()}
+      catch(e){add('err','⚠ '+(e.name=='TypeError'&&engine=='ollama'?'Impossible de joindre Ollama. Est-il lancé ?':e.name=='TypeError'&&engine=='claude'?'Pas d\'internet : Claude a besoin d\'internet.':e.message))}
+      busy=false;if(hist.length>30)hist=hist.slice(-30);
+      if(chist.length>40){let i=chist.length-30;while(i<chist.length&&!(chist[i].role=='user'&&chist[i].content.some(b=>b.type=='text')))i++;chist=chist.slice(i)}}
     ta.onkeydown=e=>{e.stopPropagation();if(e.key=='Enter'&&!e.shiftKey){e.preventDefault();send()}};$q('.send').onclick=send;
-    this.focus=()=>setTimeout(()=>ta.focus(),50);this._test={parseAction,setEngine:(n,w)=>{engine=n;web=w},send:t=>{ta.value=t;return send()}};
+    this.focus=()=>setTimeout(()=>ta.focus(),50);this._test={chist:()=>chist,addFile,parseAction,setEngine:(n,w)=>{engine=n;web=w},send:t=>{ta.value=t;return send()}};
     detect().then(welcome);return box}};
 })();
