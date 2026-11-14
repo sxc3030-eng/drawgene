@@ -46,7 +46,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v19</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v20</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a><select id="unit3" style="width:auto" title="Unités des cotes"></select>
   <span id="tbCreate"></span><button id="fExt" data-add="extrude">⬆ Extrusion</button>
   <button id="fRev" data-add="revolve">🔄 Révolution</button>
@@ -55,7 +55,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
   <span class="sep"></span>
   <button id="woodB">🪵 Bois</button><button id="consB">🔗 Contrainte</button><button id="cutlB">📋 Liste de coupe</button><button id="lockAll">🔓 Assemblage</button>
   <span class="sep"></span>
-  <button id="sugB">💡 Suggestions de la suite (activer / désactiver)</button><button id="exCh">🪵 Exemple : charpente 4 murs</button><button id="houseB">🏠 Maison 3D depuis le plan</button>
+  <button id="sugB">💡 Suggestions de la suite (activer / désactiver)</button><button id="exBr">⚙️ Exemple : bride en acier</button><button id="exCh">🪵 Exemple : charpente 4 murs</button><button id="houseB">🏠 Maison 3D depuis le plan</button>
   <button id="undoB" title="Annuler (Ctrl+Z)">↶</button><button id="redoB" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
   <span id="tbEnd"></span><button id="newB">📄 Nouveau</button><button id="saveB">💾 Enregistrer</button><button id="openB">📂 Ouvrir</button><button id="impB">📥 Importer STEP / IGES / STL / OBJ</button><button id="stlB">⬇ Exporter STL (impression 3D)</button><button id="objB">⬇ Exporter OBJ</button><button id="pngB">🖼 Exporter une image PNG</button><button id="dosB">📄 Dossier complet (vue + matériaux)</button>
   <button id="winB">🪟 Fenêtres…</button><button id="treeT">◧ Panneau de gauche</button><button id="propT">◨ Panneau de droite</button>
@@ -64,7 +64,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 <div id="main">
   <div id="tree"></div>
   <div id="view">
-    <div id="vbtn"><button data-v="iso">Iso</button><button data-v="front">Face</button><button data-v="top">Dessus</button><button data-v="right">Droite</button><button id="wireB">Filaire</button><button id="edgeB" class="on">Arêtes</button><button id="fitB">Ajuster</button><button id="measB">📏 Mesurer</button><button id="clrM">Effacer mesures</button><button id="boxB" title="Sélection par zone : glisser un rectangle (ou Maj + glisser)">⬚ Zone</button><button id="tmB" class="on" title="Flèches : déplacer (G) / tourner (R)">✥ Déplacer</button><button id="secB">✂ Vue en coupe</button><span id="secP" hidden style="display:none;align-items:center;gap:4px;background:#22252c;border:1px solid #363a44;border-radius:7px;padding:2px 6px"><select id="secA" style="width:auto"><option>X</option><option selected>Y</option><option>Z</option></select><input type="range" id="secR" min="0" max="1000" value="500" style="width:120px"><button id="secF" title="Inverser le côté">⇄</button></span></div><div id="labels" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>
+    <div id="vbtn"><button data-v="iso">Iso</button><button data-v="front">Face</button><button data-v="top">Dessus</button><button data-v="right">Droite</button><button id="wireB">Filaire</button><button id="edgeB" class="on">Arêtes</button><button id="fitB">Ajuster</button><button id="measB">📏 Mesurer</button><button id="clrM">Effacer mesures</button><button id="unlB" hidden style="background:#ffb020;color:#000;border-color:#ffb020;font-weight:700" title="Déverrouiller toutes les pièces et l'assemblage">🔓 Tout déverrouiller</button><button id="boxB" title="Sélection par zone : glisser un rectangle (ou Maj + glisser)">⬚ Zone</button><button id="tmB" class="on" title="Flèches : déplacer (G) / tourner (R)">✥ Déplacer</button><button id="secB">✂ Vue en coupe</button><span id="secP" hidden style="display:none;align-items:center;gap:4px;background:#22252c;border:1px solid #363a44;border-radius:7px;padding:2px 6px"><select id="secA" style="width:auto"><option>X</option><option selected>Y</option><option>Z</option></select><input type="range" id="secR" min="0" max="1000" value="500" style="width:120px"><button id="secF" title="Inverser le côté">⇄</button></span></div><div id="labels" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>
     <div id="info"></div><div id="dimtags" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4"></div>
   </div>
   <div id="props"></div>
@@ -89,7 +89,7 @@ const PLANES={XY:'Avant (XY)',XZ:'Dessus (XZ)',YZ:'Droite (YZ)'};
 const NIV_KEY='drawgene-niveau';let SIMPLE=true;try{SIMPLE=localStorage.getItem(NIV_KEY)!='expert'}catch(e){}
 function applyNiveau(){document.body.classList.toggle('simple',SIMPLE);const b=$('nivB');if(b){b.textContent=SIMPLE?'🎓 Simple':'🛠 Expert';b.title=SIMPLE?'Mode simple : seulement l\'essentiel. Cliquer pour tout afficher (Expert).':'Mode expert : tous les outils. Cliquer pour revenir au mode simple.'}NIV_HOOK()}
 function toggleNiveau(){SIMPLE=!SIMPLE;try{localStorage.setItem(NIV_KEY,SIMPLE?'simple':'expert')}catch(e){}applyNiveau()}
-function NIV_HOOK(){['consB','boxB','tmB','secB','clrM','wireB','edgeB'].forEach(i=>$(i)&&$(i).classList.add('adv'));document.querySelectorAll('#vbtn [data-v="right"]').forEach(x=>x.classList.add('adv'));
+function NIV_HOOK(){['consB','boxB','tmB','secB','wireB','edgeB'].forEach(i=>$(i)&&$(i).classList.add('adv'));document.querySelectorAll('#vbtn [data-v="right"]').forEach(x=>x.classList.add('adv'));
   if(typeof WM!='undefined'&&WM.panels.tree){WM.panels.tree.hidden=SIMPLE;WM.layout()}}
 // ---------- Modèle paramétrique ----------
 let M={feats:[],nid:1},sel=null,undoS=[],redoS=[];
@@ -188,7 +188,7 @@ function rebuild(){solveCons();group.clear();if(handles){scene.remove(handles);h
     if(edges&&!wire)tgt.add(new THREE.LineSegments(new THREE.EdgesGeometry(g,25),new THREE.LineBasicMaterial({color:isSel?0xffb020:0x111111,clippingPlanes:secOn?[secPlane]:null})));
     const v=volume(g),kg=v*1e-9*DENS[f.mat]*(f.qty||1);f._v=v;f._a=area(g);f._kg=v*1e-9*DENS[f.mat];g.computeBoundingBox();f._bb=g.boundingBox;tot.kg+=kg;tot.vol+=v*(f.qty||1);tot.n+=f.qty||1});
   if(house)group.add(house);
-  imports.forEach(im=>{group.add(im.mesh);if(edges&&!wire)group.add(im.edges);im.mesh.material.wireframe=wire;tot.kg+=im.kg;tot.vol+=im.vol;tot.n++});
+  imports.forEach((im,ii)=>{im.mesh.userData.imp=ii;im.mesh.material.emissive&&im.mesh.material.emissive.setHex(sel=='imp'+ii?0x3d5fa0:0);group.add(im.mesh);if(edges&&!wire)group.add(im.edges);im.mesh.material.wireframe=wire;tot.kg+=im.kg;tot.vol+=im.vol;tot.n++});
   group.updateMatrixWorld(true);
   // flèches de déplacement / rotation sur le composant sélectionné
   const rc=sc?rootOf(sc):null;if(rc&&!isLocked(rc)&&CG[sc.id]&&!measuring&&!consPick){tc.attach(CG[sc.id]);if(!tc.parent)scene.add(tc);tc.setTranslationSnap(M.step||1)}else{tc.detach();if(tc.parent)scene.remove(tc)}
@@ -196,6 +196,7 @@ function rebuild(){solveCons();group.clear();if(handles){scene.remove(handles);h
   const sf=fid(sel);if(sf&&sf.type=='extrude'&&sf.on&&(sf.profile=='rect'||sf.profile=='circle')&&!(sf.comp&&isLocked(compOf(sf.comp)))&&!measuring)buildHandles(sf,sf.comp&&CG[sf.comp]?CG[sf.comp]:group);
   buildDimTags(sc,CG);try{updateSuggest()}catch(e){}
   $('info').textContent=`Corps: ${tot.n}   Volume: ${(tot.vol/1000).toFixed(1)} cm³   Masse: ${tot.kg.toFixed(3)} kg`+(M.locked?'   🔒 Assemblage verrouillé':'')+(info.length?'\n⚠ '+info.join('\n⚠ '):'');
+  {const anyL=!!(M.locked||comps().some(c=>c.locked));$('unlB').hidden=!anyL;$('unlB').style.display=anyL?'':'none'}
   $('lockAll').textContent=(M.locked?'🔒':'🔓')+' Assemblage';$('lockAll').classList.toggle('on',!!M.locked);
   renderTree();renderProps();save()}
 const ZDIR={XY:[0,0,1],XZ:[0,1,0],YZ:[1,0,0]};
@@ -255,7 +256,7 @@ function toggleMulti(id){const cur=selComp();if(cur&&!selSet.length)selSet=[cur.
 function compProps(P,c){const lk=isLocked(c),fs=bodies().filter(b=>descIds(c).includes(b.comp)),kg=fs.reduce((s,b)=>s+(b._kg||0)*(b.qty||1),0),dis=lk?'disabled':'',k=kids(c);
   P.innerHTML=`<h4>${k.length?'📂 Sous-assemblage':'🧩 Composant'} ${lk?'<span class="lk">🔒 verrouillé</span>':''}</h4><div class="f"><span>Nom</span><input id="cN" ${dis}></div>
   ${[['X (mm)','x'],['Y (mm)','y'],['Z (mm)','z'],['Rotation X (°)','rx'],['Rotation Y (°)','ry'],['Rotation Z (°)','rz']].map(([l,kk])=>`<div class="f"><span>${l}</span><input data-k="${kk}" ${dis} value="${+(c[kk]||0).toFixed(2)}"></div>`).join('')}
-  <div class="bk"><button id="cL">${c.locked?'🔓 Déverrouiller':'🔒 Verrouiller'}</button></div>
+  <div class="bk"><button id="cL">${lk?'🔓 Déverrouiller':'🔒 Verrouiller'}</button></div>
   ${lk?'<p class="note">Pièce verrouillée : impossible de la déplacer, la modifier ou la supprimer.</p>':`
   <div class="bk"><button data-r="ry">↻ 90° Y</button><button data-r="rx">↻ 90° X</button><button data-r="rz">↻ 90° Z</button><button id="cG">⤓ Poser au sol</button></div>
   <div class="f"><span>Pas des flèches (mm)</span><input id="cS" value="${M.step||1}"></div>
@@ -265,7 +266,7 @@ function compProps(P,c){const lk=isLocked(c),fs=bodies().filter(b=>descIds(c).in
   <div class="bk"><button id="cD">Dupliquer</button><button id="cX">🗑 Supprimer</button>${k.length?'<button id="cU">Dissocier</button>':''}<button id="cK">🔗 Contrainte</button></div>`}
   <p class="note">${fs.length} corps · ${kg.toFixed(3)} kg${c.stock?' · '+c.stock.type:''}</p>`;
   $('cN').value=c.name;$('cN').onchange=()=>{snap();c.name=$('cN').value||c.name;rebuild()};
-  $('cL').onclick=()=>{snap();c.locked=!c.locked;rebuild()};if(lk)return;
+  $('cL').onclick=()=>{if(lk)unlockChain(c);else{snap();c.locked=true;rebuild()}};if(lk)return;
   P.querySelectorAll('[data-k]').forEach(i=>i.onchange=()=>{const pm=i.value.match(/^(\d+(?:[.,]\d+)?)\s*\/\s*12$/);const v=pm&&/^r/.test(i.dataset.k)?Math.atan(parseFloat(pm[1].replace(',','.'))/12)/D2R:parseFloat(i.value.replace(',','.'));if(isFinite(v)){snap();c[i.dataset.k]=Math.round(v*100)/100}rebuild()});
   P.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{snap();c[b.dataset.r]=((c[b.dataset.r]||0)+90)%360;rebuild()});
   $('cS').onchange=()=>{const v=parseFloat($('cS').value.replace(',','.'));if(v>0)M.step=v;rebuild()};
@@ -297,6 +298,8 @@ function deleteComps(ids){const all=new Set();ids.forEach(id=>{const c=compOf(id
 
 // ---------- Paramètres ----------
 function renderProps(){const P=$('props'),f=fid(sel),c=selComp();
+  if(sel=='house'){P.innerHTML=`<h4>🏠 Maison du plan 2D</h4><p class="note">Cette maison est générée depuis votre <b>plan 2D</b> : elle suit le plan automatiquement (murs, portes, fenêtres, planchers, mêmes couleurs). Pour la modifier, changez le plan.</p><div class="bk"><button id="hsP">← Ouvrir le plan 2D</button><button id="hsX">🙈 Masquer en 3D</button></div>`;$('hsP').onclick=()=>location.href='plan.html';$('hsX').onclick=()=>{M.showPlan=false;sel=null;syncPlan(false)};return}
+  if(typeof sel=='string'&&sel.startsWith('imp')){const im=imports[+sel.slice(3)];if(im){P.innerHTML=`<h4>📥 Pièce importée</h4><p class="note"><b></b><br>${im.size.x.toFixed(1)} × ${im.size.y.toFixed(1)} × ${im.size.z.toFixed(1)} mm · ${im.kg.toFixed(3)} kg (acier estimé)</p><div class="bk"><button id="imX">🗑 Supprimer l'import</button></div>`;P.querySelector('b').textContent=im.name;$('imX').onclick=()=>{imports.splice(+sel.slice(3),1);sel=null;rebuild()};return}}
   if(sel=='multi'&&selSet.length){multiProps(P);return}const k=selCon();if(k){conProps(P,k);return}
   if(c){compProps(P,c);return}
   if(!f){P.innerHTML=`<h4>Paramètres</h4><p class="note">Sélectionnez une fonction dans l'arbre ou cliquez sur une pièce en 3D.<br><br>
@@ -470,6 +473,7 @@ R.domElement.addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-dow
   if(consPick){if(!h.length||!h[0].object.userData.comp||!h[0].face){$('info').textContent='🔗 Cliquez sur une face d\'une pièce de l\'assemblage (Échap pour annuler)';return}consFace(h[0]);return}
   const o=h.length?h[0].object:null;
   if(!o){sel=null;selSet=[];rebuild();return}
+  if(o.userData.house){sel='house';selSet=[];rebuild();return}if(o.userData.imp!=null){sel='imp'+o.userData.imp;selSet=[];rebuild();return}
   if(o.userData.comp){const top=rootOf(compOf(o.userData.comp));if(e.ctrlKey||e.metaKey||e.shiftKey)toggleMulti(top.id);else{sel=(selComp()&&rootOf(selComp())===top&&e.detail>1)?'c'+o.userData.comp:'c'+top.id;selSet=[]}}
   else{sel=o.userData.id||null;selSet=[]}rebuild()});
 R.domElement.addEventListener('dblclick',e=>{const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh);
@@ -531,8 +535,13 @@ addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)
 // ---------- Suppression et menu clic droit ----------
 function deleteFeat(f){if(!f)return;const c=f.comp&&compOf(f.comp)||(fid(f.parent)&&fid(f.parent).comp&&compOf(fid(f.parent).comp));if(c&&isLocked(c)){alert('Cette pièce est verrouillée. Déverrouillez-la d\'abord.');return}
   snap();M.feats=M.feats.filter(x=>x.id!=f.id&&x.parent!=f.id);if(c&&!bodies().some(b=>b.comp==c.id)&&!kids(c).length){M.comps=comps().filter(x=>x!==c);M.cons=cons().filter(k=>k.a.comp!=c.id&&k.b.comp!=c.id)}sel=null;rebuild();$('info').textContent='🗑 Supprimé — Ctrl+Z pour annuler'}
-function deleteSelection(){if(selSet.length){deleteComps(selSet);return}const c=selComp();if(c){deleteComps([c.id]);return}const k=selCon();if(k){snap();M.cons=cons().filter(x=>x!==k);sel=null;rebuild();return}const f=fid(sel);if(f)deleteFeat(f)}
-function ctx3(e){const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh&&x.object.userData.id);
+function deleteSelection(){if(sel=='house'){M.showPlan=false;sel=null;syncPlan(false);$('info').textContent='🏠 Plan masqué en 3D (le plan 2D est intact)';return}if(typeof sel=='string'&&sel.startsWith('imp')){imports.splice(+sel.slice(3),1);sel=null;rebuild();return}if(selSet.length){deleteComps(selSet);return}const c=selComp();if(c){deleteComps([c.id]);return}const k=selCon();if(k){snap();M.cons=cons().filter(x=>x!==k);sel=null;rebuild();return}const f=fid(sel);if(f)deleteFeat(f)}
+function unlockAll(){snap();M.locked=false;comps().forEach(c=>c.locked=false);rebuild();$('info').textContent='🔓 Tout est déverrouillé'}
+function unlockChain(c){snap();M.locked=false;let x=c;while(x){x.locked=false;x=x.parent!=null?compOf(x.parent):null}descIds(c).forEach(id=>{const k=compOf(id);if(k)k.locked=false});rebuild();$('info').textContent='🔓 « '+c.name+' » déverrouillé'}
+function ctx3(e){const r=R.domElement.getBoundingClientRect();ray.setFromCamera(ndc(e,r),cam);
+  {const hh=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh);const o0=hh.length?hh[0].object:null;
+   if(o0&&o0.userData.house){sel='house';rebuild();DGMenu.show(e.clientX,e.clientY,[{head:'Maison du plan 2D'},{icon:'←',label:'Ouvrir le plan 2D pour la modifier',action:()=>location.href='plan.html'},{icon:'🙈',label:'Masquer le plan en 3D',action:()=>{M.showPlan=false;sel=null;syncPlan(false)}},'-',{icon:'⛶',label:'Ajuster la vue',action:fitView}]);return}
+   if(o0&&o0.userData.imp!=null){const ii=o0.userData.imp;sel='imp'+ii;rebuild();DGMenu.show(e.clientX,e.clientY,[{head:imports[ii].name},{icon:'🗑',label:'Supprimer l\'import',danger:true,action:()=>{imports.splice(ii,1);sel=null;rebuild()}},{icon:'⛶',label:'Ajuster la vue',action:fitView}]);return}}const h=ray.intersectObjects(group.children,true).filter(x=>x.object.isMesh&&x.object.userData.id);
   const o=h.length?h[0].object:null,f=o?fid(o.userData.id):null,C=o&&o.userData.comp?compOf(o.userData.comp):null,RT=C?rootOf(C):null,items=[];
   const hasClip=!!(clip||(()=>{try{return localStorage.getItem('drawgene-clip')}catch(x){}})());
   if(selSet.length==2&&(!C||selSet.includes(RT.id))){const [A,B]=selSet.map(compOf),doCut=(fn,msg)=>{snap();const err=fn();if(err){undoS.pop();alert(err)}else{rebuild();$('info').textContent=msg}};
@@ -553,9 +562,10 @@ function ctx3(e){const r=R.domElement.getBoundingClientRect();ray.setFromCamera(
       {icon:'↻',label:'Tourner 90°',key:'Alt+→',disabled:lk,action:()=>{snap();RT.ry=((RT.ry||0)+90)%360;rebuild()}},
       {icon:'⤓',label:'Poser au sol',disabled:lk,action:()=>{snap();groundComp(RT);rebuild()}},
       {icon:'🔗',label:'Contrainte depuis cette face',disabled:lk||!h[0].face,action:()=>{startCons();consFace(h[0])}},
-      {icon:C.locked?'🔓':'🔒',label:C.locked?'Déverrouiller':'Verrouiller',disabled:M.locked,action:()=>{snap();C.locked=!C.locked;rebuild()}},'-')}
+      lk?{icon:'🔓',label:'Déverrouiller « '+C.name+' »'+(M.locked?' (et l\'assemblage)':''),action:()=>unlockChain(C)}:{icon:'🔒',label:'Verrouiller',action:()=>{snap();C.locked=true;rebuild()}},'-')}
   else if(f){items.push({head:f.name},{icon:'🗑',label:'Supprimer',key:'Suppr',danger:true,action:()=>deleteFeat(f)},{icon:'✏',label:'Modifier les cotes',action:()=>{sel=f.id;selSet=[];rebuild()}},
       {icon:'🧩',label:'Faire un composant',action:()=>{snap();const c={id:M.nid++,name:f.name,x:0,y:0,z:0,rx:0,ry:0,rz:0};comps().push(c);f.comp=c.id;sel='c'+c.id;rebuild()}},'-')}
+  if(M.locked||comps().some(c=>c.locked))items.push({icon:'🔓',label:'Tout déverrouiller',action:unlockAll});
   items.push({icon:'📋',label:'Coller',key:'Ctrl+V',disabled:!hasClip,action:()=>pasteClip()},{icon:'↶',label:'Annuler',key:'Ctrl+Z',disabled:!undoS.length,action:()=>$('undoB').click()},{icon:'↷',label:'Rétablir',key:'Ctrl+Y',disabled:!redoS.length,action:()=>$('redoB').click()},'-',
     {icon:'▦',label:'Tout sélectionner',key:'Ctrl+A',disabled:!comps().length,action:()=>{selSet=comps().filter(c=>c.parent==null||!compOf(c.parent)).map(c=>c.id);sel=selSet.length==1?'c'+selSet[0]:'multi';if(selSet.length==1)selSet=[];rebuild()}},
     {icon:'🪵',label:'Ajouter du bois',action:()=>$('woodB').click()},{icon:'📏',label:'Mesurer',action:()=>$('measB').click()},{icon:'⛶',label:'Ajuster la vue',action:fitView});
@@ -597,7 +607,7 @@ function measurePick(hit){let p=hit.point.clone();const o=hit.object,f=hit.face,
   el.textContent=d.toFixed(2)+' mm';$('labels').append(el);measures.push({m:a.clone().add(b).multiplyScalar(.5),el});
   $('info').textContent=`📏 Distance : ${d.toFixed(2)} mm  (${(d/25.4).toFixed(3)} po)\n   ΔX ${(b.x-a.x).toFixed(2)}   ΔY ${(b.y-a.y).toFixed(2)}   ΔZ ${(b.z-a.z).toFixed(2)} mm`}
 function placeLabels(){const r=R.domElement.getBoundingClientRect();measures.forEach(m=>{const v=m.m.clone().project(cam);m.el.style.display=v.z>1?'none':'';m.el.style.left=(v.x+1)/2*r.width+'px';m.el.style.top=(1-v.y)/2*r.height+'px'})}
-$('measB').onclick=()=>{measuring=!measuring;mA=null;$('measB').classList.toggle('on',measuring);$('info').textContent=measuring?'📏 Cliquez 2 points sur la pièce (accroche aux sommets)':''};
+$('measB').onclick=()=>{measuring=!measuring;mA=null;if(!measuring)$('clrM').click();$('measB').classList.toggle('on',measuring);$('info').textContent=measuring?'📏 Cliquez 2 points sur la pièce (accroche aux sommets)':''};
 $('clrM').onclick=()=>{mG.clear();measures.forEach(m=>m.el.remove());measures.length=0;mA=null};
 
 // ---------- Vues ----------
@@ -611,19 +621,23 @@ document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>setView(b.dataset
 $('wireB').onclick=()=>{wire=!wire;$('wireB').classList.toggle('on',wire);rebuild()};$('edgeB').onclick=()=>{edges=!edges;$('edgeB').classList.toggle('on',edges);rebuild()};
 
 // ---------- Maison 3D depuis Plan 2D ----------
-$('houseB').onclick=()=>{let P;try{P=JSON.parse(localStorage.getItem('planpro')||'null')}catch(e){}
-  const walls=P&&P.ents?P.ents.filter(e=>e.type=='wall'):[];if(!walls.length){alert('Aucun mur trouvé. Dessinez d\'abord un plan dans le Plan 2D (mode Bâtiment).');return}
-  if(house){house=null;$('houseB').classList.remove('on');rebuild();fitView();return}
-  house=new THREE.Group();const wm=new THREE.MeshStandardMaterial({color:0xece6da,roughness:.9}),om=new THREE.MeshStandardMaterial({color:0x8fb8ff,transparent:true,opacity:.35});
-  const box=(L,H,T,cx,cy,cz,ang,m)=>{const g=new THREE.BoxGeometry(L,H,T),me=new THREE.Mesh(g,m);me.position.set(cx,cy,cz);me.rotation.y=-ang;house.add(me);
-    const ls=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:0x555555}));ls.position.copy(me.position);ls.rotation.copy(me.rotation);house.add(ls)};
-  walls.forEach(w=>{const dx=w.b.x-w.a.x,dy=w.b.y-w.a.y,L=Math.hypot(dx,dy),ang=Math.atan2(dy,dx),ux=dx/L,uy=dy/L;
-    const ops=P.ents.filter(o=>(o.type=='door'||o.type=='window')&&Math.abs((o.p.x-w.a.x)*-uy+(o.p.y-w.a.y)*ux)<w.t/2+5).map(o=>{const s=(o.p.x-w.a.x)*ux+(o.p.y-w.a.y)*uy;return{s0:s-o.w/2,s1:s+o.w/2,sill:o.type=='door'?0:900,h:o.h,win:o.type=='window'}}).sort((a,b)=>a.s0-b.s0);
-    const piece=(s0,s1,y0,y1,m=wm)=>{if(s1-s0<1||y1-y0<1)return;const sm=(s0+s1)/2;box(s1-s0,y1-y0,w.t,w.a.x+ux*sm,(y0+y1)/2,w.a.y+uy*sm,ang,m)};
-    let s=0;ops.forEach(o=>{piece(s,o.s0,0,w.h);piece(o.s0,o.s1,0,o.sill);piece(o.s0,o.s1,o.sill+o.h,w.h);if(o.win)piece(o.s0,o.s1,o.sill,o.sill+o.h,om);s=o.s1});piece(s,L,0,w.h)});
-  P.ents.filter(e=>e.type=='room').forEach(r=>{const S=new THREE.Shape(r.pts.map(p=>new THREE.Vector2(p.x,-p.y)));const g=new THREE.ExtrudeGeometry(S,{depth:20,bevelEnabled:false});g.rotateX(-Math.PI/2);g.translate(0,-20,0);
-    house.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:r.floor=='ceramique'?0xdddddd:0xb08a5a,roughness:.8})))});
-  $('houseB').classList.add('on');rebuild();fitView()};
+// ---------- Plan 2D affiché en 3D : toujours synchronisé, mêmes couleurs que le plan ----------
+const WALLCOL={ossature:0xc9a46a,beton:0x9aa0a8,bloc:0xb0b6c0};
+function readPlan(){try{return JSON.parse(localStorage.getItem('planpro')||'null')}catch(e){return null}}
+function buildHouse(P){const walls=P&&P.ents?P.ents.filter(e=>e.type=='wall'):[];if(!walls.length)return null;const H=new THREE.Group();H.userData.house=true;
+  const om=new THREE.MeshStandardMaterial({color:0x8fb8ff,transparent:true,opacity:.35}),dm=new THREE.MeshStandardMaterial({color:0x8a5a2b,roughness:.7});
+  const box=(L,Hh,T,cx,cy,cz,ang,mt)=>{const g=new THREE.BoxGeometry(L,Hh,T),me=new THREE.Mesh(g,mt);me.position.set(cx,cy,cz);me.rotation.y=-ang;me.userData.house=true;H.add(me);
+    const ls=new THREE.LineSegments(new THREE.EdgesGeometry(g),new THREE.LineBasicMaterial({color:0x3a2f20}));ls.position.copy(me.position);ls.rotation.copy(me.rotation);H.add(ls)};
+  walls.forEach(w=>{const wm=new THREE.MeshStandardMaterial({color:WALLCOL[w.mat]||WALLCOL.ossature,roughness:.85}),wh=w.h||2440,dx=w.b.x-w.a.x,dy=w.b.y-w.a.y,L=Math.hypot(dx,dy);if(L<1)return;const ang=Math.atan2(dy,dx),ux=dx/L,uy=dy/L;
+    const ops=P.ents.filter(o=>(o.type=='door'||o.type=='window')&&Math.abs((o.p.x-w.a.x)*-uy+(o.p.y-w.a.y)*ux)<w.t/2+5).map(o=>{const s=(o.p.x-w.a.x)*ux+(o.p.y-w.a.y)*uy;return{s0:s-o.w/2,s1:s+o.w/2,sill:o.type=='door'?0:900,h:o.h,win:o.type=='window'}}).filter(o=>o.s1>0&&o.s0<L).sort((a,b)=>a.s0-b.s0);
+    const piece=(s0,s1,y0,y1,mt=wm,t=w.t)=>{if(s1-s0<1||y1-y0<1)return;const sm=(s0+s1)/2;box(s1-s0,y1-y0,t,w.a.x+ux*sm,(y0+y1)/2,w.a.y+uy*sm,ang,mt)};
+    let s=0;ops.forEach(o=>{piece(s,o.s0,0,wh);piece(o.s0,o.s1,0,o.sill);piece(o.s0,o.s1,o.sill+o.h,wh);if(o.win)piece(o.s0,o.s1,o.sill,o.sill+o.h,om,20);else piece(o.s0+10,o.s1-10,0,o.h-5,dm,40);s=Math.max(s,o.s1)});piece(s,L,0,wh)});
+  P.ents.filter(e=>e.type=='room'&&e.pts&&e.pts.length>2).forEach(r=>{const S=new THREE.Shape(r.pts.map(p=>new THREE.Vector2(p.x,-p.y)));const g=new THREE.ExtrudeGeometry(S,{depth:20,bevelEnabled:false});g.rotateX(-Math.PI/2);g.translate(0,-20,0);
+    const me=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:r.floor=='ceramique'?0xdddddd:r.floor=='beton'?0xa0a0a0:0xb08a5a,roughness:.8}));me.userData.house=true;H.add(me)});return H}
+function syncPlan(fitIt){const P=readPlan();house=M.showPlan?buildHouse(P):null;$('houseB').classList.toggle('on',!!house);$('houseB').textContent=house?'🏠 Masquer le plan 2D en 3D':'🏠 Afficher le plan 2D en 3D';if(M.showPlan&&!house&&fitIt!==false)$('info').textContent='🏠 Le plan 2D n\'a pas encore de murs';rebuild();if(fitIt)fitView()}
+$('houseB').onclick=()=>{M.showPlan=!M.showPlan;if(M.showPlan&&!buildHouse(readPlan())){M.showPlan=false;alert('Aucun mur dans le plan 2D. Dessinez d\'abord le plan (mode Bâtiment).');return}syncPlan(true)};
+addEventListener('storage',e=>{if(e.key=='planpro'&&M.showPlan)syncPlan(false)});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&M.showPlan)syncPlan(false)});
 
 // ---------- Fichiers ----------
 function download(name,data,type){const a=document.createElement('a');a.download=name;a.href=data.startsWith&&data.startsWith('data:')?data:URL.createObjectURL(new Blob([data],{type}));a.click()}
@@ -649,7 +663,7 @@ if('launchQueue' in window)launchQueue.setConsumer(async p=>{if(p.files&&p.files
 view.addEventListener('dragover',e=>e.preventDefault());
 view.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files&&e.dataTransfer.files[0];if(!f)return;
   if(/\.(step|stp|iges|igs|stl|obj|brep)$/i.test(f.name)){importFile(f).then(()=>{rebuild();fitView()}).catch(x=>alert(f.name+' : '+x.message));return}f.text().then(t=>openText(t,f.name))});
-$('newB').onclick=()=>{if(!confirm('Nouvelle pièce ?'))return;snap();M={feats:[],nid:1,comps:[]};sel=null;house=null;rebuild();fitView()};
+$('newB').onclick=()=>{if(!confirm('Nouvelle pièce ? Tout ce qui est à l\'écran sera effacé.'))return;snap();M={feats:[],nid:1,comps:[]};sel=null;selSet=[];house=null;imports.length=0;$('clrM').click();lastPaste=null;sugDismiss=null;rebuild();fitView()};
 $('undoB').onclick=()=>{if(!undoS.length)return;redoS.push(JSON.stringify(M));M=JSON.parse(undoS.pop());rebuild()};
 $('redoB').onclick=()=>{if(!redoS.length)return;undoS.push(JSON.stringify(M));M=JSON.parse(redoS.pop());rebuild()};
 $('pngB').onclick=()=>{R.render(scene,cam);download('piece.png',R.domElement.toDataURL('image/png'))};
@@ -676,7 +690,7 @@ addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)
     const st=(M.step||1)*(e.shiftKey?10:1);snap();roots.forEach(r=>{if(e.altKey&&mv[1]==0){r.ry=((r.ry||0)+(mv[0]+mv[2]>0?90:-90)+360)%360}else{r.x=(r.x||0)+mv[0]*st;r.y=(r.y||0)+mv[1]*st;r.z=(r.z||0)+mv[2]*st}});rebuild()}});
 function setTM(m){tc.setMode(m);$('tmB').textContent=m=='rotate'?'⟳ Tourner':'✥ Déplacer'}
 $('tmB').onclick=()=>setTM(tc.getMode()=='translate'?'rotate':'translate');
-$('lockAll').onclick=()=>{snap();M.locked=!M.locked;rebuild()};
+$('lockAll').onclick=()=>{snap();M.locked=!M.locked;rebuild()};$('unlB').onclick=unlockAll;
 // ---------- Vue en coupe ----------
 function updSec(){const b=bbox(),ax=$('secA').value.toLowerCase(),t=+$('secR').value/1000,v=b.min[ax]+(b.max[ax]-b.min[ax])*t,n=new THREE.Vector3(ax=='x'?1:0,ax=='y'?1:0,ax=='z'?1:0);
   secPlane.setFromNormalAndCoplanarPoint(secFlip?n:n.clone().negate(),new THREE.Vector3(ax=='x'?v:0,ax=='y'?v:0,ax=='z'?v:0))}
@@ -829,18 +843,21 @@ function example(){M={feats:[],nid:1};const A=(f)=>{f.id=M.nid++;M.feats.push(f)
   A({type:'hole',name:'Perçages Ø10 ×6',parent:b.id,d:10,u:0,v:0,pattern:'circ',n:6,du:30,dv:0,pr:45,on:true});
   A({type:'hole',name:'Alésage central',parent:b.id,d:30,u:0,v:0,pattern:'none',n:1,du:0,dv:0,pr:0,on:true});
   A({type:'revolve',name:'Moyeu',plane:'XY',pts:'15,12; 28,12; 28,45; 22,50; 15,50',angle:360,x:0,y:0,z:0,mat:'acier',qty:1,on:true})}
-try{const o=JSON.parse(localStorage.getItem('planpro3d')||'null');if(o&&o.feats&&o.feats.length)M=o;else example()}catch(e){example()}
+try{const o=JSON.parse(localStorage.getItem('planpro3d')||'null');if(o&&o.feats)M=o;else M={feats:[],nid:1,comps:[]}}catch(e){M={feats:[],nid:1,comps:[]}}
+// l'ancienne bride d'exemple chargée automatiquement : on la retire si elle n'a jamais été touchée
+if(!(M.comps||[]).length&&M.feats.map(f=>f.name).join('|')=='Bride|Perçages Ø10 ×6|Alésage central|Moyeu')M={feats:[],nid:1,comps:[]};
 const libBox=DGLib.mount(document.body,'3d',R.domElement,insert3D,{embedded:true});
 const aiBox=DGAssist.mount('3d',AITOOLS,modelSummary,{'Menu Créer (Extrusion, Révolution, Trou, Enlèvement)':'.dgmb','Bois':'#woodB','Contrainte':'#consB','Liste de coupe':'#cutlB',
   'Annuler':'#undoB','Rétablir':'#redoB','Supprimer':'#delSel','Menu Fichier (Nouveau, Ouvrir, Enregistrer, importer, exporter)':'.dgmb','Retour au plan 2D':'a[href="plan.html"] button',
   'Vues (Iso, Face, Dessus)':'#vbtn','Mesurer':'#measB','Sélection par zone':'#boxB','Déplacer / Tourner':'#tmB','Vue en coupe':'#secB','Arbre du modèle':'#tree','Paramètres':'#props','Bibliothèque':'.dglib'});
 const WM=DGPanels.init('3d',$('main'),view,[{id:'tree',title:'Arbre du modèle',el:$('tree'),dock:'left',w:230},{id:'props',title:'Paramètres',el:$('props'),dock:'right',w:290,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:290,weight:1},{id:'lia',title:'👩 Lia — votre assistante',el:aiBox,hideMin:true,dock:'float',x:Math.max(80,innerWidth-310-360),y:Math.max(60,innerHeight-Math.min(470,innerHeight-110)-12),w:350,h:Math.min(470,innerHeight-110)}]);
+$('exBr').onclick=()=>{if(bodies().length&&!confirm('Remplacer le modèle actuel par la bride exemple ?'))return;snap();example();sel=null;rebuild();fitView()};
 $('exCh').onclick=()=>{if(bodies().length&&!confirm('Remplacer le modèle actuel par la charpente exemple ?'))return;fetch('exemples/charpente-4-murs.drawgene').then(r=>r.text()).then(t=>openText(t,'Charpente 4 murs.drawgene')).catch(()=>alert('Exemple indisponible hors ligne la première fois.'))};
 DGMenu.group('✏ Créer ▾','Extrusion, révolution, trou, enlèvement',['fExt','fRev','fHole','fCut'],$('tbCreate'));
 DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, importer, exporter',['newB','openB','saveB','-','dosB','impB','stlB','objB','pngB'],$('tbEnd'));
-const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['sugB','exCh','houseB','lockAll','winB','treeT','propT'],$('tbEnd'));
+const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['sugB','exCh','exBr','houseB','lockAll','winB','treeT','propT'],$('tbEnd'));
 $('winB').onclick=()=>WM.menu(plusB);applyNiveau();$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('treeT').onclick=()=>WM.toggleDock('left');$('propT').onclick=()=>WM.toggleDock('right');
-resize();rebuild();fitView();
+resize();if(/[?&]plan=1/.test(location.search)&&buildHouse(readPlan())){M.showPlan=true}syncPlan(true);
 </script>
 </body>
 </html>

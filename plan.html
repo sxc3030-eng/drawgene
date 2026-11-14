@@ -52,12 +52,12 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v19</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v20</small></b>
   <select id="mode" style="width:auto"><option value="bat">🏠 Bâtiment</option><option value="mec">⚙️ Pièce mécanique</option></select>
   <select id="unit" style="width:auto" title="Unités : mm, cm, m, pouces ou pieds-pouces"><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="in">pouces</option><option value="po">pieds-pouces</option></select>
   <button id="undo" title="Annuler (Ctrl+Z)">↶</button><button id="redo" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
   <button id="ortho" title="F8">Ortho</button><button id="snapB" class="on" title="F9">Aimant</button>
-  <button id="fit">Ajuster</button><a href="modele3d.html"><button>🧊 3D</button></a>
+  <button id="fit">Ajuster</button><a href="modele3d.html?plan=1" title="Voir ce plan en 3D"><button>🧊 3D</button></a>
   <span id="tbEnd"></span><button id="newB">📄 Nouveau</button><button id="saveB">💾 Enregistrer</button><button id="openB">📂 Ouvrir</button>
   <button id="photoB">📷 Photo de référence</button><button id="to3dB">⬆ Envoyer la pièce en 3D</button><button id="pngB">🖼 Exporter une image PNG</button><button id="dxfB">⬇ Exporter en DXF (AutoCAD)</button><button id="dxfI">⬆ Importer un DXF</button><button id="csvB">📊 Liste de matériaux (CSV)</button><button id="printB">🖨 Imprimer</button><button id="dosB">📄 Dossier complet (plans + matériaux)</button>
   <button id="sugB">💡 Suggestions de la suite (activer / désactiver)</button><button id="winB">🪟 Fenêtres…</button><button id="panelB">◨ Panneau de droite</button>
@@ -326,7 +326,7 @@ const angDeg=(a,b)=>{let d=-Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;if(d<0)d+=36
 
 // ---------- Interaction ----------
 let hover=false,shiftDown=false,drag=null,pointers=new Map(),pinch=null,panS=null,lastTap=0;
-function hit(w){const tol=8/view.s;let best=null,bd=1/0;const HE=S.ents.filter(e=>e.layer==S.curLayer&&layerVis(e.layer)&&!layerLock(e.layer));
+function hit(w,allLayers){const tol=8/view.s;let best=null,bd=1/0;const HE=S.ents.filter(e=>(allLayers||e.layer==S.curLayer)&&layerVis(e.layer)&&(allLayers||!layerLock(e.layer)));
   for(const e of [...HE].reverse()){let d=1/0;
     if(e.type=='wall')d=segDist(w,e.a,e.b).d-e.t/2;else if(e.type=='line')d=segDist(w,e.a,e.b).d;else if(e.type=='dim'){const L=dist(e.a,e.b)||1,nx=-(e.b.y-e.a.y)/L,ny=(e.b.x-e.a.x)/L,o=(e.o.x-e.a.x)*nx+(e.o.y-e.a.y)*ny;d=Math.min(segDist(w,{x:e.a.x+nx*o,y:e.a.y+ny*o},{x:e.b.x+nx*o,y:e.b.y+ny*o}).d,segDist(w,e.a,e.b).d+tol*.5)}
     else if(e.type=='door'||e.type=='window')d=dist(w,e.p)-e.w/2;else if(e.type=='text')d=dist(w,e.p)-200;
@@ -348,7 +348,8 @@ cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);pointers
   if(tool=='select'||!pts.length&&e.detail>1){const dh=dimAt(sp);if(dh){e.preventDefault();setTimeout(()=>openDimEd(dh),0);return}}
   if(tool=='select'){const se=byId(sel);
     if(se&&se.type!='room'){const ps=allPts(se);for(const p of ps)if(dist(W2S(p),sp)<10){snap0();drag={kind:'pt',p,moved:false};return}}
-    const h=hit(w),add2=e.ctrlKey||e.metaKey||e.shiftKey;
+    let h=hit(w);const add2=e.ctrlKey||e.metaKey||e.shiftKey;
+    if(!h){const o=hit(w,true);if(o){const L=layerOf(o.layer);if(L&&L.lock){alertBox('🔒 « '+(ENAME[o.type]||'Élément')+' » est sur le calque « '+L.name+' », verrouillé — clic droit pour le déverrouiller');ctxLockLayer=L;return}S.curLayer=o.layer;renderTabs();alertBox('📑 Calque « '+(L?L.name:'')+' » activé');h=o}}
     if(add2&&h){if(!msel.length&&sel!=null&&sel!=h.id)msel=[sel];const i=msel.indexOf(h.id);if(i>=0)msel.splice(i,1);else msel.push(h.id);sel=msel.length==1?msel[0]:null;if(msel.length==1)msel=[];renderProps();draw();return}
     if(h&&isSel(h)&&msel.length){snap0();drag=startMove(selEnts(),w);draw();return}
     msel=[];sel=h?h.id:null;renderProps();if(h){snap0();drag=startMove(h.grp?S.ents.filter(x=>x.grp==h.grp):[h],w)}else if(e.pointerType=='touch'){panS={sp,v:{...view}}}else{boxS={a:sp,b:sp,add:add2}}draw();return}
@@ -485,6 +486,7 @@ addEventListener('keydown',e=>{const tg=e.target.tagName;if(tg=='INPUT'||tg=='SE
 
 // ---------- Menu clic droit ----------
 const ENAME={wall:'Mur',line:'Ligne',rect:'Rectangle',circle:'Cercle',poly:'Polygone',room:'Pièce',door:'Porte',window:'Fenêtre',dim:'Cote',text:'Texte'};
+let ctxLockLayer=null;
 function ctxMenu(ev,sp){const w=S2W(sp);if(pts.length){DGMenu.show(ev.clientX,ev.clientY,[{icon:'✔',label:'Terminer le tracé',key:'Entrée',action:finish},{icon:'✕',label:'Annuler le tracé',key:'Échap',action:()=>{pts=[];draw()}}]);return}
   const h=hit(w);if(h&&!isSel(h)){msel=[];sel=h.id;renderProps();draw()}
   const L=selEnts(),one=L.length==1?L[0]:null,g=L.length&&L[0].grp&&L.every(e=>e.grp==L[0].grp);
@@ -497,6 +499,9 @@ function ctxMenu(ev,sp){const w=S2W(sp);if(pts.length){DGMenu.show(ev.clientX,ev
     if(S.layers.length>1)S.layers.filter(l=>l.id!=L[0].layer).forEach(l=>items.push({icon:'📑',label:'Envoyer vers « '+l.name+' »',action:()=>{snap0();L.forEach(e=>e.layer=l.id);msel=[];sel=null;changed()}}));
     if(one)items.push({icon:'⚙',label:'Propriétés',action:()=>{document.querySelector('#tabs [data-p=props]').click();const pp=WM.panels.side;if(pp.hidden||pp.min){pp.hidden=false;pp.min=false;WM.layout()}}});
     items.push('-')}
+  {const o=hit(w,true),L=o&&layerOf(o.layer);if(L&&L.lock)items.unshift({head:'Calque « '+L.name+' » verrouillé'},{icon:'🔓',label:'Déverrouiller le calque « '+L.name+' »',action:()=>{L.lock=false;S.curLayer=L.id;renderTabs();draw();save();alertBox('🔓 Calque déverrouillé')}},'-')}
+  if(S.layers.some(l=>l.lock||l.vis===false))items.push({icon:'🔓',label:'Tout déverrouiller et tout afficher',action:()=>{S.layers.forEach(l=>{l.lock=false;l.vis=true});renderTabs();draw();save();alertBox('🔓 Tous les calques sont visibles et déverrouillés')}});
+  if(S.bg)items.push({icon:'🖼',label:'Retirer la photo de fond',action:()=>{S.bg=null;saveBg();renderCfg();draw()}});
   items.push({icon:'📋',label:'Coller ici',key:'Ctrl+V',disabled:!(clip2||(()=>{try{return localStorage.getItem('drawgene-clip2d')}catch(e){}})()),action:()=>paste2(w)},
     {icon:'↶',label:'Annuler',key:'Ctrl+Z',disabled:!undoS.length,action:undo},{icon:'↷',label:'Rétablir',key:'Ctrl+Y',disabled:!redoS.length,action:redo},'-',
     {icon:'▦',label:'Tout sélectionner',key:'Ctrl+A',action:selectAll},{icon:'⛶',label:'Ajuster la vue',action:fit});
