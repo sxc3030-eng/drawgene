@@ -37,3 +37,32 @@ let undoBurst=0,undoT=0;document.addEventListener('keydown',e=>{const k=(e.ctrlK
 const watch=id=>{const el=document.getElementById(id);if(!el)return;let last='';new MutationObserver(()=>{const t=el.textContent.trim();if(t&&t!==last&&/⚠|impossible|introuvable|invalide|verrouill|aucun|erreur|trop/i.test(t)){last=t;log('message',t)}}).observe(el,{childList:true,characterData:true,subtree:true})};
 addEventListener('load',()=>{['info','help','sInfo'].forEach(watch);log('ouverture',page+' '+(((document.querySelector('#top b small')||{}).textContent)||''))});
 })();
+// drawGene — boîte « Un problème ? » : Eugene écrit ce qui ne va pas ; envoyé à SouverainCode avec le journal ci-dessus.
+// Sans connexion, le commentaire attend sur cet ordinateur et repart tout seul plus tard.
+(function(){
+const QK='drawgene-com-attente';
+const ai=()=>{try{return JSON.parse(localStorage.getItem('drawgene-ai')||'{}')}catch(e){return{}}};
+const file=()=>{try{return JSON.parse(localStorage.getItem(QK)||'[]')}catch(e){return[]}};
+const setFile=f=>{try{localStorage.setItem(QK,JSON.stringify(f))}catch(e){}};
+async function envoyer(c){const a=ai();if(!a.souvJeton)throw new Error('pas de jeton');
+  const r=await fetch((a.souvUrl||'https://souveraincode.ca')+'/api/drawgene/commentaire',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+a.souvJeton},body:JSON.stringify(c)});
+  if(!r.ok)throw new Error('serveur '+r.status);return true}
+async function vider(){const f=file();if(!f.length)return;const reste=[];for(const c of f){try{await envoyer(c)}catch(e){reste.push(c)}}setFile(reste);majBadge()}
+let btn=null;function majBadge(){if(!btn)return;const n=file().length;btn.textContent=n?'💬 Un problème ? ('+n+' en attente)':'💬 Un problème ?'}
+function ouvrir(){if(document.getElementById('dgcom')){document.getElementById('dgcom').remove();return}
+  const w=document.createElement('div');w.id='dgcom';
+  w.style.cssText='position:fixed;right:12px;top:52px;z-index:310;width:min(380px,calc(100vw - 24px));background:#1b1d23;color:#e6e7ea;border:2px solid #ffb020;border-radius:12px;box-shadow:0 14px 40px #000c;font:14px system-ui;padding:12px;display:grid;gap:8px';
+  w.innerHTML='<b style="font-size:15px">💬 Qu\'est-ce qui ne marche pas ?</b><span style="color:#9aa0ab;font-size:12.5px">Écrivez-le comme vous le diriez : ce que vous vouliez faire et ce qui s\'est passé. On va le réparer.</span><textarea rows="5" style="background:#0f1115;color:#e6e7ea;border:1px solid #363a44;border-radius:8px;padding:8px;font:inherit;resize:vertical" placeholder="Ex. : je n\'arrive pas à coller deux planches ensemble en 3D"></textarea><div style="display:flex;gap:8px"><button data-a="ok" style="flex:1;background:#ffb020;color:#1b1d23;border:0;border-radius:8px;padding:9px;font:600 14px system-ui;cursor:pointer">Envoyer</button><button data-a="x" style="background:#2f333c;color:#e6e7ea;border:1px solid #363a44;border-radius:8px;padding:9px 14px;cursor:pointer">Fermer</button></div><span class="mm" style="font-size:12.5px"></span>';
+  const ta=w.querySelector('textarea'),mm=w.querySelector('.mm');ta.addEventListener('keydown',e=>e.stopPropagation());
+  w.onclick=async e=>{const a=e.target.dataset&&e.target.dataset.a;if(a=='x')w.remove();if(a!='ok')return;const t=ta.value.trim();if(!t){ta.focus();return}
+    const c={texte:t,page:location.pathname.split('/').pop()||'index.html',version:((document.querySelector('#top b small')||{}).textContent||''),journal:DGLog.text().split('\n').slice(-150).join('\n'),quand:new Date().toISOString()};
+    DGLog.log('message','commentaire : '+t);e.target.disabled=true;mm.textContent='Envoi…';
+    try{await envoyer(c);mm.style.color='#3dff8b';mm.textContent='✔ Merci ! C\'est envoyé, on s\'en occupe.';ta.value='';setTimeout(()=>w.remove(),2500)}
+    catch(err){setFile([...file(),c]);majBadge();mm.style.color='#ffb020';mm.textContent='✔ Noté sur cet ordinateur. Il partira tout seul dès que la connexion sera prête.';ta.value='';setTimeout(()=>w.remove(),3500)}
+    e.target.disabled=false};
+  document.body.append(w);ta.focus()}
+addEventListener('load',()=>{btn=document.createElement('button');btn.id='dgcomB';
+  btn.style.cssText='position:fixed;left:12px;bottom:12px;z-index:305;background:#ffb020;color:#1b1d23;border:0;border-radius:20px;padding:7px 14px;font:600 13px system-ui;cursor:pointer;box-shadow:0 4px 14px #0008';
+  btn.onclick=ouvrir;const top=document.getElementById('top');if(top){btn.style.cssText='margin-left:auto;background:#ffb020;color:#1b1d23;border:0;border-radius:16px;padding:5px 12px;font:600 13px system-ui;cursor:pointer;white-space:nowrap';top.append(btn)}else document.body.append(btn);majBadge();vider();setInterval(vider,5*60*1000);addEventListener('online',vider)});
+window.DGCom={ouvrir,vider,file};
+})();
