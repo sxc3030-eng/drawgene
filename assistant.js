@@ -2,6 +2,7 @@
 // Moteur 3 : Claude (Anthropic) avec une clé API gardée SEULEMENT sur cet ordinateur — lit aussi les PDF / images de plans (Inventor, AutoCAD).
 (function(){
 const css=`.dgp.float:has(.dga){min-width:340px;min-height:420px}.dgdock .dgp:has(.dga){min-height:300px}
+.dga [hidden]{display:none!important}
 .dga{display:flex;flex-direction:column;height:100%;min-height:0;font:13px system-ui;color:#e6e7ea}
 .dga .st{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid #363a44;font-size:11px;color:#9aa0ab}
 .dga .av{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:17px;background:radial-gradient(circle at 30% 30%,#ff9ad5,#7b4dff);box-shadow:0 0 0 2px #22252c,0 0 0 3px #b07bff}
@@ -24,7 +25,7 @@ const css=`.dgp.float:has(.dga){min-width:340px;min-height:420px}.dgdock .dgp:ha
 .dga .att{display:flex;flex-wrap:wrap;gap:4px;padding:0 8px}.dga .att span{background:#3d8bff22;border:1px solid #3d8bff66;border-radius:10px;padding:2px 8px;font-size:11px;cursor:pointer}
 .dga .sugg{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.dga .sugg button{max-width:100%;white-space:normal;text-align:left;background:#1b1d23;border:1px solid #7b4dff88;color:#c9a8ff;border-radius:12px;padding:3px 9px;cursor:pointer;font:11.5px system-ui}`;
 const KEY='drawgene-ai';
-function cfg(){let c={};try{c=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}return{souvUrl:c.souvUrl||'https://souveraincode.ca',souvJeton:c.souvJeton||'',claudeKey:c.claudeKey||'',claudeModel:c.claudeModel||'claude-opus-5-5',voice:c.voice!==false}}
+function cfg(){let c={};try{c=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}return{souvUrl:c.souvUrl||'https://souveraincode.ca',souvJeton:c.souvJeton||'',souvIA:c.souvIA||'routeur',claudeKey:c.claudeKey||'',claudeModel:c.claudeModel||'claude-opus-5-5',voice:c.voice!==false}}
 function saveCfg(p){try{localStorage.setItem(KEY,JSON.stringify({...cfg(),...p}))}catch(e){}}
 // lien de branchement : …/plan.html#cle=sk-ant-… → la clé est enregistrée sur cet ordinateur puis effacée de l'adresse (le # n'est jamais envoyé au serveur)
 try{const m=location.hash.match(/(?:^#|&)cle=(sk-ant-[A-Za-z0-9_\-]+)/),j=location.hash.match(/(?:^#|&)souv=([A-Za-z0-9_\-]{24,})/),u=location.hash.match(/(?:^#|&)srv=(https:\/\/[A-Za-z0-9.\-]+)/);if(j)saveCfg({souvJeton:j[1],...(u?{souvUrl:u[1]}:{})});if(m||j){if(m)saveCfg({claudeKey:m[1]});history.replaceState(null,'',location.pathname+location.search);addEventListener('load',()=>setTimeout(()=>alert('✔ Lia est branchée sur cet ordinateur.'),300))}}catch(e){}
@@ -41,7 +42,7 @@ window.DGAssist={
       run:x=>{const g=guide[x.element];if(!g)return'élément inconnu';const el=typeof g=='function'?g():document.querySelector(g);return DGMenu.flash(el)?'le bouton « '+x.element+' » clignote à l\'écran':'élément introuvable'}}];if(!document.getElementById('dgacss')){const s=document.createElement('style');s.id='dgacss';s.textContent=css;document.head.append(s)}
     const box=document.createElement('div');box.className='dga';
     box.innerHTML=`<div class="st"><span class="av">👩</span><span class="who"><b>Lia</b><span class="stt"><span class="dot"></span>…</span></span><button class="vo" title="Voix de Lia (lecture à voix haute)">🔊</button><button class="cf" title="Réglages de Lia">⚙</button><button class="cl" title="Nouvelle conversation">🧹</button></div>
-<div class="cfg" hidden></div><div class="log"></div>
+<div class="iasel" hidden style="padding:4px 8px;border-bottom:1px solid #363a44;font-size:11.5px;color:#9aa0ab;display:flex;gap:6px;align-items:center">Parler à <select style="flex:1;background:#1b1d23;border:1px solid #363a44;border-radius:6px;color:#e6e7ea;padding:2px 4px;font:inherit"></select></div><div class="cfg" hidden></div><div class="log"></div>
 <div class="att"></div><div class="ft"><input type="file" class="fi" hidden multiple accept=".pdf,image/*,.csv,.txt,.xls,.xlsx"><button class="clip" title="Joindre un plan (PDF Inventor, photo, capture, liste de cotes)">📎</button><button class="mic" title="Parler à Lia (micro)">🎤</button><textarea placeholder="Écrivez à Lia… (Entrée pour envoyer)"></textarea><button class="send">➤</button></div>`;
     const $q=s=>box.querySelector(s),log=$q('.log'),ta=$q('textarea'),stt=$q('.stt'),cfgBox=$q('.cfg'),av=$q('.av');
     let hist=[],chist=[],pend=[],busy=false,engine=null;
@@ -64,7 +65,12 @@ window.DGAssist={
       r.onerror=e=>{mb.classList.remove('on');add('err',e.error=='not-allowed'?'Le micro est bloqué : autorisez-le dans la barre d\'adresse.':'Micro indisponible ('+e.error+'). La reconnaissance vocale demande internet.')};r.onend=()=>mb.classList.remove('on');r.start()};
     // ---- choix du moteur ----
     const nomEng=()=>engine=='souverain'?'SouverainCode':'Claude';
-    async function detect(){const c=cfg();if(c.souvJeton){engine='souverain';setSt('ok','Prêt · SouverainCode');}else if(c.claudeKey){engine='claude';setSt('ok','Prêt · Claude');}else{engine=null;setSt('wait','À brancher (⚙)')}}
+    let iaListe=[];const iaBox=box.querySelector('.iasel'),iaSel=iaBox.querySelector('select');
+    const iaNom=()=>{const x=iaListe.find(i=>i.id==cfg().souvIA);return x?x.label.split(' — ')[0].replace(/^IA principale.*/,'IA principale'):'SouverainCode'};
+    iaSel.onchange=()=>{saveCfg({souvIA:iaSel.value});setSt('ok','Prête · '+iaNom());const x=iaListe.find(i=>i.id==iaSel.value);if(x)add('t','🔀 Vous parlez maintenant à '+x.label+(x.description?' — '+x.description:''))};
+    async function chargerIA(){const c=cfg();try{const r=await fetch(c.souvUrl+'/api/drawgene/etat',{headers:{authorization:'Bearer '+c.souvJeton}});if(!r.ok)return;const j=await r.json();iaListe=j.ia||[];
+      iaSel.innerHTML='';iaListe.forEach(i=>{const o=document.createElement('option');o.value=i.id;o.textContent=i.label;o.title=i.description||'';iaSel.append(o)});if(!iaListe.some(i=>i.id==c.souvIA))saveCfg({souvIA:'routeur'});iaSel.value=cfg().souvIA;iaBox.hidden=iaListe.length<2;setSt('ok','Prête · '+iaNom())}catch(e){}}
+    async function detect(){const c=cfg();iaBox.hidden=true;if(c.souvJeton){engine='souverain';setSt('ok','Prête · SouverainCode');chargerIA();}else if(c.claudeKey){engine='claude';setSt('ok','Prête · Claude');}else{engine=null;setSt('wait','À brancher (⚙)')}}
     // ---- écran d'accueil ----
     const SUG=app=='3d'?['Ajoute 8 montants 2x4 aux 16 po','Fais une plaque d\'acier 200 par 100 par 6 avec 4 trous de 10','Combien de planches dois-je acheter ?','Comment je verrouille une pièce ?']
       :['Dessine une pièce de 4 m par 3,5 m','Ajoute une chambre de 12 pi par 10 pi','Combien ça va coûter en matériaux ?','Comment je change une cote ?'];
@@ -136,7 +142,7 @@ window.DGAssist={
     function souvErr(st,j){if(st==401)return'Jeton refusé par SouverainCode : vérifiez-le dans ⚙.';if(st==503)return'L\'accès drawGene n\'est pas encore activé sur le serveur SouverainCode.';if(st==429)return'Trop de demandes : attendez une minute.';if(st==504||st==502)return'Le serveur IA de SouverainCode ne répond pas. Réessayez dans un instant.';return'SouverainCode : '+((j&&j.message)||'erreur '+st)}
     async function turnSouv(){const c=cfg();
       for(let round=0;round<12;round++){const bub=add('a','…');
-        const r=await fetch(c.souvUrl+'/api/drawgene/chat',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+c.souvJeton},body:JSON.stringify({messages:[{role:'system',content:PERSONA+CLAUDE_RULE+'\n\nÉtat actuel du dessin :\n'+context()},...shist],tools:otools})});
+        const r=await fetch(c.souvUrl+'/api/drawgene/chat',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+c.souvJeton},body:JSON.stringify({ia:c.souvIA,messages:[{role:'system',content:PERSONA+CLAUDE_RULE+'\n\nÉtat actuel du dessin :\n'+context()},...shist],tools:otools})});
         const j=await r.json().catch(()=>({}));if(!r.ok){bub.remove();throw new Error(souvErr(r.status,j))}
         const m=(j.choices&&j.choices[0]&&j.choices[0].message)||{role:'assistant',content:''};const msg={role:'assistant',content:m.content||''};if(m.tool_calls&&m.tool_calls.length)msg.tool_calls=m.tool_calls;shist.push(msg);
         const txt=String(m.content||'').trim();if(txt)bub.textContent=txt;else bub.remove();
