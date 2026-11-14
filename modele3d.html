@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#14315c"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes">
+<script src="diag.js"></script>
 <script src="update.js"></script>
 <script>if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{})</script>
 <title>drawGene 3D</title>
@@ -46,7 +47,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v20</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v21</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a><select id="unit3" style="width:auto" title="Unités des cotes"></select>
   <span id="tbCreate"></span><button id="fExt" data-add="extrude">⬆ Extrusion</button>
   <button id="fRev" data-add="revolve">🔄 Révolution</button>
@@ -55,7 +56,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
   <span class="sep"></span>
   <button id="woodB">🪵 Bois</button><button id="consB">🔗 Contrainte</button><button id="cutlB">📋 Liste de coupe</button><button id="lockAll">🔓 Assemblage</button>
   <span class="sep"></span>
-  <button id="sugB">💡 Suggestions de la suite (activer / désactiver)</button><button id="exBr">⚙️ Exemple : bride en acier</button><button id="exCh">🪵 Exemple : charpente 4 murs</button><button id="houseB">🏠 Maison 3D depuis le plan</button>
+  <button id="repB">🩺 Rapport de problème</button><button id="sugB">💡 Suggestions de la suite (activer / désactiver)</button><button id="exBr">⚙️ Exemple : bride en acier</button><button id="exCh">🪵 Exemple : charpente 4 murs</button><button id="houseB">🏠 Maison 3D depuis le plan</button>
   <button id="undoB" title="Annuler (Ctrl+Z)">↶</button><button id="redoB" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
   <span id="tbEnd"></span><button id="newB">📄 Nouveau</button><button id="saveB">💾 Enregistrer</button><button id="openB">📂 Ouvrir</button><button id="impB">📥 Importer STEP / IGES / STL / OBJ</button><button id="stlB">⬇ Exporter STL (impression 3D)</button><button id="objB">⬇ Exporter OBJ</button><button id="pngB">🖼 Exporter une image PNG</button><button id="dosB">📄 Dossier complet (vue + matériaux)</button>
   <button id="winB">🪟 Fenêtres…</button><button id="treeT">◧ Panneau de gauche</button><button id="propT">◨ Panneau de droite</button>
@@ -570,7 +571,7 @@ function ctx3(e){const r=R.domElement.getBoundingClientRect();ray.setFromCamera(
     {icon:'▦',label:'Tout sélectionner',key:'Ctrl+A',disabled:!comps().length,action:()=>{selSet=comps().filter(c=>c.parent==null||!compOf(c.parent)).map(c=>c.id);sel=selSet.length==1?'c'+selSet[0]:'multi';if(selSet.length==1)selSet=[];rebuild()}},
     {icon:'🪵',label:'Ajouter du bois',action:()=>$('woodB').click()},{icon:'📏',label:'Mesurer',action:()=>$('measB').click()},{icon:'⛶',label:'Ajuster la vue',action:fitView});
   DGMenu.show(e.clientX,e.clientY,items)}
-$('delSel').onclick=deleteSelection;$('sugB').onclick=()=>{SUGG_ON=!SUGG_ON;try{localStorage.setItem('drawgene-sugg',SUGG_ON?'on':'off')}catch(e){}rebuild();$('info').textContent=SUGG_ON?'💡 Suggestions activées : la suite apparaît en rose, Tab pour l\'ajouter':'💡 Suggestions désactivées'};$('dosB').onclick=openDossier3D;
+$('delSel').onclick=deleteSelection;$('repB').onclick=()=>DGLog.show();$('sugB').onclick=()=>{SUGG_ON=!SUGG_ON;try{localStorage.setItem('drawgene-sugg',SUGG_ON?'on':'off')}catch(e){}rebuild();$('info').textContent=SUGG_ON?'💡 Suggestions activées : la suite apparaît en rose, Tab pour l\'ajouter':'💡 Suggestions désactivées'};$('dosB').onclick=openDossier3D;
 $('unit3').innerHTML=DGUnits.options(DGUnits.get());$('unit3').onchange=()=>{DGUnits.set($('unit3').value);rebuild()};
 
 // ---------- Copier / coller (répète l'espacement) ----------
@@ -855,7 +856,7 @@ $('exBr').onclick=()=>{if(bodies().length&&!confirm('Remplacer le modèle actuel
 $('exCh').onclick=()=>{if(bodies().length&&!confirm('Remplacer le modèle actuel par la charpente exemple ?'))return;fetch('exemples/charpente-4-murs.drawgene').then(r=>r.text()).then(t=>openText(t,'Charpente 4 murs.drawgene')).catch(()=>alert('Exemple indisponible hors ligne la première fois.'))};
 DGMenu.group('✏ Créer ▾','Extrusion, révolution, trou, enlèvement',['fExt','fRev','fHole','fCut'],$('tbCreate'));
 DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, importer, exporter',['newB','openB','saveB','-','dosB','impB','stlB','objB','pngB'],$('tbEnd'));
-const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['sugB','exCh','exBr','houseB','lockAll','winB','treeT','propT'],$('tbEnd'));
+const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['repB','sugB','exCh','exBr','houseB','lockAll','winB','treeT','propT'],$('tbEnd'));
 $('winB').onclick=()=>WM.menu(plusB);applyNiveau();$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('treeT').onclick=()=>WM.toggleDock('left');$('propT').onclick=()=>WM.toggleDock('right');
 resize();if(/[?&]plan=1/.test(location.search)&&buildHouse(readPlan())){M.showPlan=true}syncPlan(true);
 </script>

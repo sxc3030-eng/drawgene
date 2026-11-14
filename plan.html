@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#14315c"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes">
+<script src="diag.js"></script>
 <script src="update.js"></script>
 <script>if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js").catch(()=>{})</script>
 <title>drawGene</title>
@@ -52,7 +53,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v20</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante (sans internet)">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>📐 drawGene <small style="font-weight:400;opacity:.6;font-size:11px">v21</small></b>
   <select id="mode" style="width:auto"><option value="bat">🏠 Bâtiment</option><option value="mec">⚙️ Pièce mécanique</option></select>
   <select id="unit" style="width:auto" title="Unités : mm, cm, m, pouces ou pieds-pouces"><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option><option value="in">pouces</option><option value="po">pieds-pouces</option></select>
   <button id="undo" title="Annuler (Ctrl+Z)">↶</button><button id="redo" title="Rétablir (Ctrl+Y)">↷</button><button id="delSel" title="Supprimer la sélection (Suppr)">🗑</button>
@@ -60,7 +61,7 @@ td input{width:62px;padding:2px 4px;text-align:right;background:#1b1d23;border:1
   <button id="fit">Ajuster</button><a href="modele3d.html?plan=1" title="Voir ce plan en 3D"><button>🧊 3D</button></a>
   <span id="tbEnd"></span><button id="newB">📄 Nouveau</button><button id="saveB">💾 Enregistrer</button><button id="openB">📂 Ouvrir</button>
   <button id="photoB">📷 Photo de référence</button><button id="to3dB">⬆ Envoyer la pièce en 3D</button><button id="pngB">🖼 Exporter une image PNG</button><button id="dxfB">⬇ Exporter en DXF (AutoCAD)</button><button id="dxfI">⬆ Importer un DXF</button><button id="csvB">📊 Liste de matériaux (CSV)</button><button id="printB">🖨 Imprimer</button><button id="dosB">📄 Dossier complet (plans + matériaux)</button>
-  <button id="sugB">💡 Suggestions de la suite (activer / désactiver)</button><button id="winB">🪟 Fenêtres…</button><button id="panelB">◨ Panneau de droite</button>
+  <button id="repB">🩺 Rapport de problème</button><button id="sugB">💡 Suggestions de la suite (activer / désactiver)</button><button id="winB">🪟 Fenêtres…</button><button id="panelB">◨ Panneau de droite</button>
   <input type="file" id="file" accept=".drawgene,.json,application/json" hidden><input type="file" id="photoF" accept="image/*" hidden><input type="file" id="dxfF" accept=".dxf" hidden>
 </div>
 <div id="main">
@@ -868,7 +869,7 @@ $('dxfF').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(txt=
   out.forEach(o=>{if(o.type=='poly'&&o.pts.length<2)return;if(!isShape(o)||o.type=='poly'&&!o.closed)o.role='trait';add(o)});
   sh.forEach(o=>o.role=defRole(shapeCenter(o)));sel=null;changed();fit();alertBox('📥 '+out.length+' entités importées')});e.target.value=''};
 
-$('delSel').onclick=deleteSel;$('sugB').onclick=()=>{SUGG_ON=!SUGG_ON;try{localStorage.setItem('drawgene-sugg',SUGG_ON?'on':'off')}catch(e){}draw();alertBox(SUGG_ON?'💡 Suggestions activées : Tab pour accepter':'💡 Suggestions désactivées')};$('dosB').onclick=openDossier;
+$('delSel').onclick=deleteSel;$('repB').onclick=()=>DGLog.show();$('sugB').onclick=()=>{SUGG_ON=!SUGG_ON;try{localStorage.setItem('drawgene-sugg',SUGG_ON?'on':'off')}catch(e){}draw();alertBox(SUGG_ON?'💡 Suggestions activées : Tab pour accepter':'💡 Suggestions désactivées')};$('dosB').onclick=openDossier;
 $('undo').onclick=undo;$('redo').onclick=redo;$('fit').onclick=fit;
 function toggle(k){S.cfg[k]=!S.cfg[k];$(k=='snap'?'snapB':'ortho').classList.toggle('on',S.cfg[k]);save()}
 $('ortho').onclick=()=>toggle('ortho');$('snapB').onclick=()=>toggle('snap');
@@ -890,7 +891,7 @@ const aiBox=DGAssist.mount('2d',AITOOLS,drawingSummary,{'Sélection':tb('select'
   'Calques':'#ltabs','Ajouter un calque':()=>[...document.querySelectorAll('#ltabs .tb')].find(x=>/Calque/.test(x.textContent)&&/＋/.test(x.textContent)),'Propriétés':tabB('props'),'Matériaux et coûts':tabB('mat'),'Réglages':tabB('cfg'),'Bibliothèque':'.dglib'});
 const WM=DGPanels.init('2d',$('main'),$('stage'),[{id:'tools',title:'Outils',el:$('tools'),dock:'left',w:64},{id:'side',title:'Propriétés',el:$('side'),dock:'right',w:300,weight:1.7},{id:'lib',title:'📚 Bibliothèque',el:libBox,dock:'right',w:300,weight:1},{id:'lia',title:'👩 Lia — votre assistante',el:aiBox,hideMin:true,dock:'float',x:Math.max(80,innerWidth-310-360),y:Math.max(60,innerHeight-Math.min(470,innerHeight-110)-12),w:350,h:Math.min(470,innerHeight-110)}]);
 DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, exporter',['newB','openB','saveB','-','dosB','printB','pngB','dxfB','dxfI','csvB','-','photoB'],$('tbEnd'));
-const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['sugB','to3dB','winB','panelB'],$('tbEnd'));
+const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['repB','sugB','to3dB','winB','panelB'],$('tbEnd'));
 $('winB').onclick=()=>WM.menu(plusB);applyNiveau();$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('panelB').onclick=()=>WM.toggleDock('right');
 setMode(S.mode);renderCfg();resize();S.ents.forEach(e=>{if(e.id>=nid)nid=e.id+1});
 if(!S.ents.length)exampleHouse();else fit();renderProps();
