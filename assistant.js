@@ -25,10 +25,10 @@ const css=`.dgp.float:has(.dga){min-width:340px;min-height:420px}.dgdock .dgp:ha
 .dga .att{display:flex;flex-wrap:wrap;gap:4px;padding:0 8px}.dga .att span{background:#3d8bff22;border:1px solid #3d8bff66;border-radius:10px;padding:2px 8px;font-size:11px;cursor:pointer}
 .dga .sugg{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.dga .sugg button{max-width:100%;white-space:normal;text-align:left;background:#1b1d23;border:1px solid #7b4dff88;color:#c9a8ff;border-radius:12px;padding:3px 9px;cursor:pointer;font:11.5px system-ui}`;
 const KEY='drawgene-ai';
-function cfg(){let c={};try{c=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}return{souvUrl:c.souvUrl||'https://souveraincode.ca',souvJeton:c.souvJeton||'',souvIA:c.souvIA||'routeur',claudeKey:c.claudeKey||'',claudeModel:c.claudeModel||'claude-opus-5-5',voice:c.voice!==false}}
+function cfg(){let c={};try{c=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}return{ollUrl:c.ollUrl||'http://localhost:11434',ollModel:c.ollModel||'ministral-3:8b',aide:c.aide||'',claudeKey:c.claudeKey||'',claudeModel:c.claudeModel||'claude-opus-5-5',voice:c.voice!==false}}
 function saveCfg(p){try{localStorage.setItem(KEY,JSON.stringify({...cfg(),...p}))}catch(e){}}
-// lien de branchement : …/plan.html#cle=sk-ant-… → la clé est enregistrée sur cet ordinateur puis effacée de l'adresse (le # n'est jamais envoyé au serveur)
-try{const m=location.hash.match(/(?:^#|&)cle=(sk-ant-[A-Za-z0-9_\-]+)/),j=location.hash.match(/(?:^#|&)souv=([A-Za-z0-9_\-]{24,})/),u=location.hash.match(/(?:^#|&)srv=(https:\/\/[A-Za-z0-9.\-]+)/);if(j)saveCfg({souvJeton:j[1],...(u?{souvUrl:u[1]}:{})});if(m||j){if(m)saveCfg({claudeKey:m[1]});history.replaceState(null,'',location.pathname+location.search);addEventListener('load',()=>setTimeout(()=>alert('✔ Lia est branchée sur cet ordinateur.'),300))}}catch(e){}
+// lien de réglage : …/plan.html#cle=sk-ant-… (Claude, optionnel) ou #aide=courriel (à qui envoyer les problèmes) ; effacé de l'adresse aussitôt
+try{const m=location.hash.match(/(?:^#|&)cle=(sk-ant-[A-Za-z0-9_\-]+)/),a=location.hash.match(/(?:^#|&)aide=([^&]+@[^&]+)/);if(m)saveCfg({claudeKey:m[1]});if(a)saveCfg({aide:decodeURIComponent(a[1])});if(m||a)history.replaceState(null,'',location.pathname+location.search)}catch(e){}
 const PERSONA=`Tu t'appelles Lia. Tu es l'assistante intégrée de drawGene, un logiciel de dessin technique (plans de maison et pièces mécaniques, 2D et 3D) pensé par Eugene, un technicien québécois. Tu parles à la première personne, au féminin (« je suis prête », « je l'ai ajouté »), avec chaleur et simplicité.
 Réponds TOUJOURS en français, en 1 à 3 phrases courtes (tes réponses sont lues à voix haute). Unités internes : millimètres (1 po = 25,4 mm, 1 pi = 304,8 mm, 16 po c/c = 406 mm).
 Quand on te demande de créer, modifier, supprimer ou calculer quelque chose dans le dessin, fais-le avec une action. Si la personne veut apprendre (« comment », « montre-moi », « où est »), utilise l'action montrer pour faire clignoter le bon bouton, puis explique en une phrase. S'il manque une dimension, choisis une valeur raisonnable et dis-le.
@@ -64,47 +64,40 @@ window.DGAssist={
       r.onresult=e=>{ta.value=[...e.results].map(x=>x[0].transcript).join('');if(e.results[e.results.length-1].isFinal){mb.classList.remove('on');send()}};
       r.onerror=e=>{mb.classList.remove('on');add('err',e.error=='not-allowed'?'Le micro est bloqué : autorisez-le dans la barre d\'adresse.':'Micro indisponible ('+e.error+'). La reconnaissance vocale demande internet.')};r.onend=()=>mb.classList.remove('on');r.start()};
     // ---- choix du moteur ----
-    const nomEng=()=>engine=='souverain'?'SouverainCode':'Claude';
-    let iaListe=[];const iaBox=box.querySelector('.iasel'),iaSel=iaBox.querySelector('select');
-    const iaNom=()=>{const x=iaListe.find(i=>i.id==cfg().souvIA);return x?x.label.split(' — ')[0].replace(/^IA principale.*/,'IA principale'):'SouverainCode'};
-    iaSel.onchange=()=>{saveCfg({souvIA:iaSel.value});setSt('ok','Prête · '+iaNom());const x=iaListe.find(i=>i.id==iaSel.value);if(x)add('t','🔀 Vous parlez maintenant à '+x.label+(x.description?' — '+x.description:''))};
-    async function chargerIA(){const c=cfg();try{const r=await fetch(c.souvUrl+'/api/drawgene/etat',{headers:{authorization:'Bearer '+c.souvJeton}});if(!r.ok)return;const j=await r.json();iaListe=j.ia||[];
-      iaSel.innerHTML='';iaListe.forEach(i=>{const o=document.createElement('option');o.value=i.id;o.textContent=i.label;o.title=i.description||'';iaSel.append(o)});if(!iaListe.some(i=>i.id==c.souvIA))saveCfg({souvIA:'routeur'});iaSel.value=cfg().souvIA;iaBox.hidden=iaListe.length<2;setSt('ok','Prête · '+iaNom())}catch(e){}}
-    async function detect(){const c=cfg();iaBox.hidden=true;if(c.souvJeton){engine='souverain';setSt('ok','Prête · SouverainCode');chargerIA();}else if(c.claudeKey){engine='claude';setSt('ok','Prête · Claude');}else{engine=null;setSt('wait','À brancher (⚙)')}}
+    // Lia tourne sur CET ordinateur avec Ollama (rien ne sort de la maison). Claude (clé API) reste optionnel.
+    const nomEng=()=>engine=='local'?'Ollama':'Claude';let olla={ok:false,modeles:[]};
+    const iaBox=box.querySelector('.iasel'),iaSel=iaBox.querySelector('select');
+    iaSel.onchange=()=>{saveCfg({ollModel:iaSel.value});setSt('ok','Prête · '+iaSel.value+' (sur cet ordinateur)');add('t','🔀 Lia utilise maintenant '+iaSel.value)};
+    async function sonder(){const c=cfg();try{const r=await fetch(c.ollUrl+'/api/tags',{signal:AbortSignal.timeout(3000)});const j=await r.json();
+        olla={ok:true,modeles:(j.models||[]).map(m=>m.name).filter(n=>!/embed/i.test(n))}}catch(e){olla={ok:false,modeles:[]}}return olla}
+    const aLe=(l,m)=>l.find(n=>n==m||n==m+':latest'||n.split(':')[0]==m.split(':')[0]&&!m.includes(':'));
+    async function detect(){const c=cfg();iaBox.hidden=true;setSt('wait','Je me prépare…');await sonder();
+      if(olla.ok&&olla.modeles.length){const m=aLe(olla.modeles,c.ollModel)||olla.modeles.find(n=>/ministral|mistral/i.test(n))||olla.modeles[0];if(m!=c.ollModel)saveCfg({ollModel:m});
+        engine='local';iaSel.innerHTML='';olla.modeles.forEach(n=>{const o=document.createElement('option');o.value=o.textContent=n;iaSel.append(o)});iaSel.value=m;iaBox.hidden=olla.modeles.length<2;setSt('ok','Prête · '+m+' (sur cet ordinateur)');return}
+      if(c.claudeKey){engine='claude';setSt('ok','Prête · Claude');return}
+      engine=null;setSt('wait',olla.ok?'Modèle à installer':'À installer sur cet ordinateur')}
     // ---- écran d'accueil ----
     const SUG=app=='3d'?['Ajoute 8 montants 2x4 aux 16 po','Fais une plaque d\'acier 200 par 100 par 6 avec 4 trous de 10','Combien de planches dois-je acheter ?','Comment je verrouille une pièce ?']
       :['Dessine une pièce de 4 m par 3,5 m','Ajoute une chambre de 12 pi par 10 pi','Combien ça va coûter en matériaux ?','Comment je change une cote ?'];
     let saluee=false;box.addEventListener('pointerdown',()=>{if(!saluee&&engine){saluee=true;say('Bonjour, je suis Lia ! Que voulez-vous faire ?')}},{once:false});
     function welcome(){log.innerHTML='';const c=cfg(),d=document.createElement('div');d.className='m a';
-      d.textContent='Bonjour, je suis Lia ! Que voulez-vous faire ? Je peux le faire pour vous, ou vous montrer comment. Donnez-moi aussi un plan Inventor en PDF ou une photo avec 📎 : je lis les cotes et je le redessine.';
+      d.textContent='Bonjour, je suis Lia ! Que voulez-vous faire ? Je peux le faire pour vous, ou vous montrer comment. Donnez-moi aussi un plan Inventor en PDF ou une photo avec 📎 : je lis les cotes et je le redessine.'+(engine=='local'?' Je fonctionne sur votre ordinateur : rien ne sort de chez vous.':'');
       const s=document.createElement('div');s.className='sugg';SUG.forEach(x=>{const b=document.createElement('button');b.textContent=x;b.onclick=()=>{ta.value=x;send()};s.append(b)});
       if(!engine){const h=document.createElement('div');h.className='help';
-        h.innerHTML='<b>🔌 Brancher Lia (une seule fois)</b><br>Tapez le <b>code à 6 chiffres</b> qu\'on vous a donné :<input class="k" inputmode="numeric" autocomplete="off" placeholder="ex. 482913" style="width:100%;margin-top:6px;background:#0f1115;border:1px solid #363a44;border-radius:6px;color:#e6e7ea;padding:8px;font:600 18px ui-monospace,monospace;letter-spacing:.2em;text-align:center"><button class="big">🔌 Brancher</button><div class="rm" style="margin-top:6px"></div>';
-        const kk=h.querySelector('.k'),rm=h.querySelector('.rm');kk.onkeydown=e=>{e.stopPropagation();if(e.key=='Enter')h.querySelector('.big').click()};
-        h.querySelector('.big').onclick=async()=>{const k=kk.value.trim();if(k.length>=24){saveCfg({souvJeton:k});detect().then(welcome);return}
-          const code=k.replace(/\D/g,'');if(code.length<6){rm.textContent='Le code a 6 chiffres.';return}rm.textContent='Je me branche…';
-          try{const r=await fetch(cfg().souvUrl+'/api/drawgene/jumeler',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code})});const j=await r.json().catch(()=>({}));
-            if(!r.ok){rm.textContent='⚠ '+(j.message||'Erreur '+r.status);return}saveCfg({souvJeton:j.jeton});await detect();welcome();const m='Voilà, je suis branchée ! Que puis-je faire pour vous ?';add('a',m);say(m)}
-          catch(e){rm.textContent='⚠ Pas de connexion internet ?'}};log.append(h)}
+        h.innerHTML=olla.ok?'<b>📥 Il manque mon cerveau</b><br>Ollama est là, mais sans modèle. Double-cliquez <a href="installer-assistant.bat" download>installer-assistant.bat</a> (téléchargé), attendez la fin, puis :<button class="big">🔄 Réessayer</button>'
+          :'<b>📥 M\'installer sur cet ordinateur (une seule fois)</b><ol style="margin:6px 0 0;padding-left:18px"><li>Installez <a href="https://ollama.com/download" target="_blank" rel="noopener">Ollama</a> (bouton « Download for Windows »).</li><li>Téléchargez puis double-cliquez <a href="installer-assistant.bat" download>installer-assistant.bat</a>. Il installe mon cerveau (environ 6 Go, ça peut prendre un moment).</li><li>Cliquez :</li></ol><button class="big">🔄 C\'est fait, réessayer</button>';
+        h.querySelector('.big').onclick=()=>detect().then(()=>{welcome();if(engine){const m='Voilà, je suis prête ! Que puis-je faire pour vous ?';add('a',m);say(m)}});log.append(h)}
       log.append(d,s)}
     function showCfg(){const c=cfg();cfgBox.hidden=!cfgBox.hidden;if(cfgBox.hidden)return;
-      cfgBox.innerHTML=`<b>SouverainCode (ton serveur)</b><label>Adresse<input class="su"></label><label>Jeton drawGene (reste sur cet ordinateur)<input class="sj" type="password"></label><button class="ts">🔎 Vérifier la connexion</button>
+      cfgBox.innerHTML=`<b>Lia sur cet ordinateur (Ollama)</b><label>Adresse d'Ollama<input class="ou"></label><label>Modèle<input class="om" placeholder="ministral-3:8b"></label><button class="ts">🔎 Vérifier</button>
 <details><summary>Claude (optionnel, clé API Anthropic)</summary><label>Clé API Claude<input class="ck" type="password" placeholder="sk-ant-…"></label><label>Modèle Claude<select class="cm"><option value="claude-opus-5-5">Claude Opus 5.5</option><option value="claude-sonnet-5-5">Claude Sonnet 5.5</option><option value="claude-haiku-5-5">Claude Haiku 5.5</option></select></label></details>
-<button class="tv">🔊 Tester la voix de Lia</button><button class="sv">Enregistrer</button>
-<div class="help"><b>📧 Brancher un autre ordinateur</b><br>Envoie un lien : la personne clique dessus et Lia est branchée chez elle.<label style="display:block;margin-top:6px">Courriel<input class="em" type="email" placeholder="papa@exemple.com"></label><button class="big ml">📧 Envoyer le lien par courriel</button><button class="big cp" style="background:#2f333c">📋 Copier le lien</button></div><button class="lc">📋 Voir les problèmes signalés</button>`;
-      const v=x=>cfgBox.querySelector(x);v('.tv').onclick=()=>{if(!('speechSynthesis' in window)){alert('Ce navigateur ne sait pas parler. Utilisez Chrome ou Edge.');return}if(!cfg().voice)saveCfg({voice:true}),upV();const vv=pickVoice();say('Bonjour, je suis Lia. Vous m\'entendez bien ?');if(!vv)setTimeout(()=>add('err','Aucune voix française installée. Windows : Paramètres → Heure et langue → Voix → ajouter Français (Canada).'),400)};v('.su').value=c.souvUrl;v('.sj').value=c.souvJeton;v('.ck').value=c.claudeKey;v('.cm').value=c.claudeModel;
-      v('.lc').onclick=async()=>{try{const r=await fetch(v('.su').value.trim().replace(/\/$/,'')+'/api/drawgene/commentaires',{headers:{authorization:'Bearer '+v('.sj').value.trim()}});if(!r.ok)throw new Error('erreur '+r.status);const j=await r.json();
-        const w=document.createElement('div');w.style.cssText='position:fixed;inset:6% 8%;z-index:320;background:#1b1d23;color:#e6e7ea;border:2px solid #ffb020;border-radius:12px;overflow:auto;padding:14px;font:13px system-ui';
-        w.innerHTML='<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><b style="flex:1">📋 Problèmes signalés ('+j.commentaires.length+')</b><button>✕</button></div>';w.querySelector('button').onclick=()=>w.remove();
-        j.commentaires.forEach(c=>{const d=document.createElement('details');d.style.cssText='border-top:1px solid #363a44;padding:8px 0';const sm=document.createElement('summary');sm.textContent=new Date(c.recu).toLocaleString('fr-CA')+' · '+c.page+' · '+c.texte;const pre=document.createElement('pre');pre.style.cssText='white-space:pre-wrap;font:11px ui-monospace,monospace;color:#9aa0ab';pre.textContent=c.journal;d.append(sm,pre);w.append(d)});
-        if(!j.commentaires.length)w.append('Aucun problème signalé pour l\'instant.');document.body.append(w)}catch(e){alert('Impossible de lire les problèmes : '+e.message)}};
-      v('.ts').onclick=async()=>{const b=v('.ts');b.textContent='…';try{const r=await fetch(v('.su').value.trim().replace(/\/$/,'')+'/api/drawgene/etat',{headers:{authorization:'Bearer '+v('.sj').value.trim()}});b.textContent=r.ok?'✔ Connecté':r.status==401?'✖ Jeton refusé':r.status==503?'✖ Pas encore activé sur le serveur':'✖ Erreur '+r.status}catch(e){b.textContent='✖ Serveur injoignable'}};
-      const lien=()=>{const j=v('.sj').value.trim(),k=v('.ck').value.trim(),u=v('.su').value.trim().replace(/\/$/,'');if(j.length<24&&!/^sk-ant-/.test(k)){alert('Entrez d\'abord le jeton SouverainCode.');return null}
-        return location.origin+location.pathname.replace(/[^/]*$/,'')+'plan.html#'+(j.length>=24?'souv='+j+(u!='https://souveraincode.ca'?'&srv='+u:''):'cle='+k)};
-      v('.ml').onclick=()=>{const l=lien();if(!l)return;const to=v('.em').value.trim();
-        location.href='mailto:'+encodeURIComponent(to)+'?subject='+encodeURIComponent('drawGene : brancher Lia sur ton ordinateur')+'&body='+encodeURIComponent('Bonjour,\n\nSur ton ordinateur, ouvre ce lien une seule fois (avec Chrome ou Edge) :\n\n'+l+'\n\nTu verras « Lia est branchée sur cet ordinateur ». C\'est tout ! Ensuite clique sur 👩 Lia dans drawGene.\n\nAprès, tu peux effacer ce courriel.')};
-      v('.cp').onclick=()=>{const l=lien();if(!l)return;(navigator.clipboard?navigator.clipboard.writeText(l):Promise.reject()).then(()=>alert('Lien copié. Collez-le dans un courriel ou un texto.'),()=>prompt('Copiez ce lien :',l))};
-      v('.sv').onclick=()=>{saveCfg({souvUrl:v('.su').value.trim().replace(/\/$/,'')||'https://souveraincode.ca',souvJeton:v('.sj').value.trim(),claudeKey:v('.ck').value.trim(),claudeModel:v('.cm').value});cfgBox.hidden=true;detect().then(()=>{if(!hist.length)welcome()})}}
+<label>Courriel pour « Un problème ? » (la personne qui s'occupe de drawGene)<input class="ai" type="email" placeholder="ex. simon@exemple.com"></label>
+<button class="tv">🔊 Tester la voix de Lia</button><button class="sv">Enregistrer</button>`;
+      const v=x=>cfgBox.querySelector(x);v('.tv').onclick=()=>{if(!('speechSynthesis' in window)){alert('Ce navigateur ne sait pas parler. Utilisez Chrome ou Edge.');return}if(!cfg().voice)saveCfg({voice:true}),upV();const vv=pickVoice();say('Bonjour, je suis Lia. Vous m\'entendez bien ?');if(!vv)setTimeout(()=>add('err','Aucune voix française installée. Windows : Paramètres → Heure et langue → Voix → ajouter Français (Canada).'),400)};
+      v('.ou').value=c.ollUrl;v('.om').value=c.ollModel;v('.ck').value=c.claudeKey;v('.cm').value=c.claudeModel;v('.ai').value=c.aide;
+      v('.ts').onclick=async()=>{const b=v('.ts');b.textContent='…';try{const r=await fetch(v('.ou').value.trim().replace(/\/$/,'')+'/api/tags',{signal:AbortSignal.timeout(3000)});const j=await r.json();const l=(j.models||[]).map(m=>m.name);
+        b.textContent=l.length?'✔ Ollama répond · modèles : '+l.join(', '):'⚠ Ollama répond mais aucun modèle : lancez installer-assistant.bat'}catch(e){b.textContent='✖ Ollama ne répond pas (pas installé, pas lancé, ou installer-assistant.bat pas encore fait)'}};
+      v('.sv').onclick=()=>{saveCfg({ollUrl:v('.ou').value.trim().replace(/\/$/,'')||'http://localhost:11434',ollModel:v('.om').value.trim()||'ministral-3:8b',claudeKey:v('.ck').value.trim(),claudeModel:v('.cm').value,aide:v('.ai').value.trim()});cfgBox.hidden=true;detect().then(()=>{if(!hist.length)welcome()})}}
     $q('.cf').onclick=showCfg;$q('.cl').onclick=()=>{hist=[];chist=[];shist=[];pend=[];showAtt();if('speechSynthesis' in window)speechSynthesis.cancel();welcome()};
     // ---- conversation ----
     async function runTool(name,args){const t=tools.find(x=>x.name==name);let res;try{res=t?await t.run(args||{}):'Outil inconnu : '+name}catch(e){res='Erreur : '+e.message}
@@ -142,27 +135,26 @@ window.DGAssist={
         const cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,cv.width,cv.height);await pg.render({canvasContext:cx,viewport:vp}).promise;out.push(cv.toDataURL('image/jpeg',.85))}
       if(doc.numPages>max)add('t','📄 '+a.name+' : '+max+' premières pages envoyées sur '+doc.numPages);return out}
     async function blocsOpenAI(list){const o=[];for(const a of list){if(a.kind=='txt')o.push({type:'text',text:'Fichier « '+a.name+' » :\n'+a.text});else if(a.kind=='img')o.push({type:'image_url',image_url:{url:'data:'+a.mime+';base64,'+a.data}});else(await pdfImages(a)).forEach(u=>o.push({type:'image_url',image_url:{url:u}}))}return o}
-    // ---- SouverainCode (routeur LLM, format OpenAI) ----
+    // ---- Ollama local (format OpenAI, http://localhost:11434/v1) ----
     let shist=[];const otools=tools.map(t=>({type:'function',function:{name:t.name,description:t.description,parameters:t.parameters}}));
-    function souvErr(st,j){if(st==401)return'Jeton refusé par SouverainCode : vérifiez-le dans ⚙.';if(st==503)return'L\'accès drawGene n\'est pas encore activé sur le serveur SouverainCode.';if(st==429)return'Trop de demandes : attendez une minute.';if(st==504||st==502)return'Le serveur IA de SouverainCode ne répond pas. Réessayez dans un instant.';return'SouverainCode : '+((j&&j.message)||'erreur '+st)}
-    async function turnSouv(){const c=cfg();
+    async function turnLocal(){const c=cfg();
       for(let round=0;round<12;round++){const bub=add('a','…');
-        const r=await fetch(c.souvUrl+'/api/drawgene/chat',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+c.souvJeton},body:JSON.stringify({ia:c.souvIA,messages:[{role:'system',content:PERSONA+CLAUDE_RULE+'\n\nÉtat actuel du dessin :\n'+context()},...shist],tools:otools})});
-        const j=await r.json().catch(()=>({}));if(!r.ok){bub.remove();throw new Error(souvErr(r.status,j))}
+        const r=await fetch(c.ollUrl+'/v1/chat/completions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({model:c.ollModel,stream:false,temperature:.2,messages:[{role:'system',content:PERSONA+CLAUDE_RULE+'\n\nÉtat actuel du dessin :\n'+context()},...shist],tools:otools})});
+        const j=await r.json().catch(()=>({}));if(!r.ok){bub.remove();throw new Error(r.status==404?'Le modèle '+c.ollModel+' n\'est pas installé : lancez installer-assistant.bat.':'Ollama : '+((j.error&&j.error.message)||j.error||'erreur '+r.status))}
         const m=(j.choices&&j.choices[0]&&j.choices[0].message)||{role:'assistant',content:''};const msg={role:'assistant',content:m.content||''};if(m.tool_calls&&m.tool_calls.length)msg.tool_calls=m.tool_calls;shist.push(msg);
         const txt=String(m.content||'').trim();if(txt)bub.textContent=txt;else bub.remove();
         if(!msg.tool_calls){say(txt);return}
         for(const tc of msg.tool_calls){const f=tc.function||{};let a=f.arguments||{};if(typeof a=='string'){try{a=JSON.parse(a)}catch(e){a={}}}shist.push({role:'tool',tool_call_id:tc.id,content:await runTool(f.name,a)})}}}
-    $q('.clip').onclick=()=>{if(!engine){add('err','Branchez d\'abord Lia (⚙).');return}fi.click()};
+    $q('.clip').onclick=()=>{if(!engine){add('err','Installez d\'abord Lia sur cet ordinateur (voir l\'encadré).');return}fi.click()};
     fi.onchange=async()=>{for(const f of fi.files)await addFile(f);fi.value='';ta.focus()};
     box.addEventListener('dragover',e=>e.preventDefault());box.addEventListener('drop',async e=>{if(!e.dataTransfer.files.length||!engine)return;e.preventDefault();e.stopPropagation();for(const f of e.dataTransfer.files)await addFile(f)});
     async function send(){let q=ta.value.trim();if(pend.length&&!q)q='Redessine ce plan dans drawGene avec toutes ses cotes.';if(!q||busy)return;if('speechSynthesis' in window)speechSynthesis.cancel();
-      if(!engine){await detect();if(!engine){add('err','Branchez d\'abord Lia (encadré ci-dessus ou ⚙).');return}}
+      if(!engine){await detect();if(!engine){add('err','Installez d\'abord Lia sur cet ordinateur (encadré ci-dessus).');return}}
       ta.value='';busy=true;add('u',q+(pend.length?'\n📎 '+pend.map(a=>a.name).join(', '):''));hist.push({role:'user',content:q});
       const pj=pend;pend=[];showAtt();
-      try{if(engine=='souverain'){shist.push({role:'user',content:pj.length?[...await blocsOpenAI(pj),{type:'text',text:q}]:q});await turnSouv()}
+      try{if(engine=='local'){shist.push({role:'user',content:pj.length?[...await blocsOpenAI(pj),{type:'text',text:q}]:q});await turnLocal()}
         else{chist.push({role:'user',content:[...pj.map(blocClaude),{type:'text',text:q}]});await turnClaude()}}
-      catch(e){add('err','⚠ '+(e.name=='TypeError'?'Impossible de joindre '+nomEng()+' (internet ?).':e.message))}
+      catch(e){add('err','⚠ '+(e.name=='TypeError'?(engine=='local'?'Ollama ne répond plus : est-il lancé ? (redémarrez l\'ordinateur au besoin)':'Impossible de joindre Claude (internet ?).'):e.message))}
       busy=false;if(hist.length>30)hist=hist.slice(-30);
       if(shist.length>40){let i=shist.length-30;while(i<shist.length&&shist[i].role!='user')i++;shist=shist.slice(i)}
       if(chist.length>40){let i=chist.length-30;while(i<chist.length&&!(chist[i].role=='user'&&chist[i].content.some(b=>b.type=='text')))i++;chist=chist.slice(i)}}

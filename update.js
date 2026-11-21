@@ -1,6 +1,6 @@
 // drawGene : mise à jour AUTOMATIQUE. Au démarrage, la nouvelle version s'installe tout de suite.
 // Pendant le travail, elle s'installe dès qu'on ne touche à rien pendant 1 minute (ou qu'on change de fenêtre) ; le dessin est enregistré avant.
-(function(){const APPV=31;
+(function(){const APPV=32;
 function force(){try{typeof save=='function'&&save()}catch(e){}const go=()=>location.replace(location.pathname+'?maj='+Date.now());
   Promise.all([window.caches?caches.keys().then(k=>Promise.all(k.map(x=>caches.delete(x)))):0,navigator.serviceWorker?navigator.serviceWorker.getRegistrations().then(r=>Promise.all(r.map(x=>x.unregister()))):0]).then(go,go)}
 let attente=false,dernier=Date.now();['pointerdown','pointermove','keydown','wheel'].forEach(t=>addEventListener(t,()=>dernier=Date.now(),true));
