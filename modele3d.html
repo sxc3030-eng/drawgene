@@ -47,7 +47,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px;border-b
 </head>
 <body>
 <div id="top">
-  <button id="aiB" class="lia" title="Lia, votre assistante">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v32</small></b>
+  <button id="aiB" class="lia" title="Lia, votre assistante">👩 Lia</button><button id="nivB" onclick="toggleNiveau()">🎓 Simple</button><b>🧊 drawGene 3D <small style="font-weight:400;opacity:.6;font-size:11px">v33</small></b>
   <a href="plan.html"><button>← Plan 2D</button></a><select id="unit3" style="width:auto" title="Unités des cotes"></select>
   <span id="tbCreate"></span><button id="fExt" data-add="extrude">⬆ Extrusion</button>
   <button id="fRev" data-add="revolve">🔄 Révolution</button>
@@ -90,8 +90,8 @@ const PLANES={XY:'Avant (XY)',XZ:'Dessus (XZ)',YZ:'Droite (YZ)'};
 const NIV_KEY='drawgene-niveau';let SIMPLE=true;try{SIMPLE=localStorage.getItem(NIV_KEY)!='expert'}catch(e){}
 function applyNiveau(){document.body.classList.toggle('simple',SIMPLE);const b=$('nivB');if(b){b.textContent=SIMPLE?'🎓 Simple':'🛠 Expert';b.title=SIMPLE?'Mode simple : seulement l\'essentiel. Cliquer pour tout afficher (Expert).':'Mode expert : tous les outils. Cliquer pour revenir au mode simple.'}NIV_HOOK()}
 function toggleNiveau(){SIMPLE=!SIMPLE;try{localStorage.setItem(NIV_KEY,SIMPLE?'simple':'expert')}catch(e){}applyNiveau()}
-function NIV_HOOK(){['consB','boxB','tmB','secB','wireB','edgeB'].forEach(i=>$(i)&&$(i).classList.add('adv'));document.querySelectorAll('#vbtn [data-v="right"]').forEach(x=>x.classList.add('adv'));
-  if(typeof WM!='undefined'&&WM.panels.tree){WM.panels.tree.hidden=SIMPLE;WM.layout()}}
+function NIV_HOOK(){['boxB','secB','wireB','edgeB'].forEach(i=>$(i)&&$(i).classList.add('adv'));document.querySelectorAll('#vbtn [data-v="right"]').forEach(x=>x.classList.add('adv'));
+  if(typeof WM!='undefined'&&WM.panels.tree&&!comps().length){WM.panels.tree.hidden=SIMPLE;WM.layout()}}
 // ---------- Modèle paramétrique ----------
 let M={feats:[],nid:1},sel=null,undoS=[],redoS=[];
 function snap(){undoS.push(JSON.stringify(M));if(undoS.length>80)undoS.shift();redoS=[]}
@@ -247,7 +247,7 @@ function renderTree(){const T=$('tree');let h='<h4>Arbre du modèle</h4><div cla
   bodies().filter(f=>!f.comp).forEach(f=>bl(f,18));
   if(comps().length)h+=`<h4>Assemblage ${M.locked?'<span class="lk">🔒</span>':''}</h4>`;
   const cl=(c,ind)=>{const k=kids(c),on=sel=='c'+c.id||selSet.includes(c.id);
-    h+=`<div class="it ${on?'sel':''}" data-c="${c.id}" style="margin-left:${ind}px">${k.length?'📂':'🧩'} ${E(c.name)}${c.locked?' <span class="lk">🔒</span>':''}${cons().some(x=>x.a.comp==c.id||x.b.comp==c.id)?' 🔗':''}</div>`;
+    h+=`<div class="it ${on?'sel':''}" data-c="${c.id}" style="margin-left:${ind}px"><input type="checkbox" data-cb="${c.id}" ${on?'checked':''} title="Cocher pour sélectionner plusieurs pièces" style="margin:0 4px 0 0;width:auto">${k.length?'📂':'🧩'} ${E(c.name)}${c.locked?' <span class="lk">🔒</span>':''}${cons().some(x=>x.a.comp==c.id||x.b.comp==c.id)?' 🔗':''}</div>`;
     if(on||k.length){k.forEach(x=>cl(x,ind+14));if(on)bodies().filter(f=>f.comp==c.id).forEach(f=>bl(f,ind+14))}};
   comps().filter(c=>c.parent==null||!compOf(c.parent)).forEach(c=>cl(c,0));
   if(cons().length){h+='<h4>Contraintes</h4>';cons().forEach(k=>{const a=compOf(k.a.comp),b=compOf(k.b.comp);
@@ -258,7 +258,7 @@ function renderTree(){const T=$('tree');let h='<h4>Arbre du modèle</h4><div cla
   T.innerHTML=h;T.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{imports.splice(+b.dataset.rm,1);rebuild()});
   T.querySelectorAll('[data-id]').forEach(e=>e.onclick=()=>{sel=+e.dataset.id;selSet=[];rebuild()});
   T.querySelectorAll('[data-k]').forEach(e=>e.onclick=()=>{sel='k'+e.dataset.k;selSet=[];rebuild()});
-  T.querySelectorAll('[data-c]').forEach(e=>e.onclick=ev=>{const id=+e.dataset.c;if(ev.ctrlKey||ev.metaKey||ev.shiftKey){toggleMulti(id)}else{sel='c'+id;selSet=[]}rebuild()})}
+  T.querySelectorAll('[data-c]').forEach(e=>e.onclick=ev=>{const id=+e.dataset.c;if(ev.target.dataset.cb||ev.ctrlKey||ev.metaKey||ev.shiftKey){toggleMulti(id)}else{sel='c'+id;selSet=[]}rebuild()})}
 function toggleMulti(id){const cur=selComp();if(cur&&!selSet.length)selSet=[cur.id];const i=selSet.indexOf(id);if(i>=0)selSet.splice(i,1);else selSet.push(id);sel=selSet.length==1?'c'+selSet[0]:(selSet.length?'multi':null);if(selSet.length==1)selSet=[]}
 function compProps(P,c){const lk=isLocked(c),fs=bodies().filter(b=>descIds(c).includes(b.comp)),kg=fs.reduce((s,b)=>s+(b._kg||0)*(b.qty||1),0),dis=lk?'disabled':'',k=kids(c);
   P.innerHTML=`<h4>${k.length?'📂 Sous-assemblage':'🧩 Composant'} ${lk?'<span class="lk">🔒 verrouillé</span>':''}</h4><div class="f"><span>Nom</span><input id="cN" ${dis}></div>
@@ -488,9 +488,9 @@ R.domElement.addEventListener('dblclick',e=>{const r=R.domElement.getBoundingCli
 function startCons(){if(comps().length<2){alert('Il faut au moins 2 pièces dans l\'assemblage.');return}consPick=1;consA=null;tc.detach();$('consB').classList.add('on');$('info').textContent='🔗 1/2 : cliquez la FACE de la pièce qui doit bouger';}
 function consFace(hit){const o=hit.object,c=compOf(o.userData.comp),Wi=worldMat(c).invert(),p=hit.point.clone().applyMatrix4(Wi),n=hit.face.normal.clone().normalize();
   const rec={comp:c.id,p:[p.x,p.y,p.z].map(v=>Math.round(v*1000)/1000),n:[n.x,n.y,n.z].map(v=>Math.round(v*1e6)/1e6)};
-  if(consPick==1){consA=rec;consPick=2;$('info').textContent='🔗 2/2 : cliquez la FACE de référence sur une autre pièce';return}
+  if(consPick==1){consA=rec;consPick=2;$('info').textContent='🔗 2/2 : cliquez la FACE de référence sur une autre pièce';window.asmEtape&&asmEtape(2);return}
   if(rootOf(compOf(rec.comp))===rootOf(compOf(consA.comp))){$('info').textContent='🔗 Choisissez une face sur une AUTRE pièce';return}
-  snap();const k={id:M.nid++,type:'mate',off:0,a:consA,b:rec};cons().push(k);consPick=0;consA=null;$('consB').classList.remove('on');sel='k'+k.id;rebuild()}
+  snap();const k={id:M.nid++,type:window.ASM_TYPE||'mate',off:+(window.ASM_OFF||0),a:consA,b:rec};cons().push(k);consPick=0;consA=null;$('consB').classList.remove('on');sel='k'+k.id;rebuild();window.asmApres&&asmApres(k)}
 $('consB').onclick=()=>{if(consPick){consPick=0;$('consB').classList.remove('on');rebuild()}else startCons()};
 // ---------- Sélection par zone (rectangle) ----------
 let boxMode=false;
@@ -869,6 +869,61 @@ DGMenu.group('✏ Créer ▾','Extrusion, révolution, trou, enlèvement',['fExt
 DGMenu.group('📁 Fichier ▾','Nouveau, ouvrir, enregistrer, importer, exporter',['newB','openB','saveB','-','dosB','impB','stlB','objB','pngB'],$('tbEnd'));
 const plusB=DGMenu.group('⋯ Plus ▾','Autres commandes',['repB','sugB','exCh','exBr','houseB','lockAll','colB','winB','treeT','propT'],$('tbEnd'));
 $('winB').onclick=()=>WM.menu(plusB);applyNiveau();$('aiB').onclick=()=>{const p=WM.panels.lia;if(p.hidden||p.min){p.hidden=false;p.min=false;WM.layout();DGAssist.focus()}else{p.min=true;WM.layout()}};$('treeT').onclick=()=>WM.toggleDock('left');$('propT').onclick=()=>WM.toggleDock('right');
+
+// ---------- Ruban « Assembler » (façon logiciels de CAO pro) : placer, contraindre, déplacer, fixer, grouper ----------
+(function(){
+const css=`#asmBar{position:absolute;left:8px;top:44px;z-index:6;display:flex;flex-wrap:wrap;gap:4px;align-items:center;background:#1b1d23ee;border:1px solid #3d8bff;border-radius:10px;padding:5px 6px;max-width:calc(100% - 16px)}
+#asmBar b{font:700 11px system-ui;color:#7fb2ff;letter-spacing:.08em;margin:0 4px}#asmBar button{padding:5px 9px}#asmBar .n{font-size:12px;color:#ffb020;margin-left:4px}
+#asmDlg{position:absolute;left:8px;top:92px;z-index:7;width:300px;background:#1b1d23;border:2px solid #3d8bff;border-radius:10px;padding:10px;font:13px system-ui;color:#e6e7ea;box-shadow:0 10px 30px #000a;display:grid;gap:8px}
+#asmDlg .ty{display:grid;grid-template-columns:1fr 1fr;gap:6px}#asmDlg .ty button{display:grid;gap:2px;text-align:center;padding:8px 4px;line-height:1.2}#asmDlg .ty button.on{background:#3d8bff;border-color:#3d8bff;color:#fff}
+#asmDlg .st{padding:6px 8px;border-radius:7px;background:#0f1115;border:1px solid #363a44}#asmDlg .st.cur{border-color:#ffb020;color:#ffb020}#asmDlg .st.ok{border-color:#3dff8b;color:#3dff8b}
+#asmDlg .row{display:flex;gap:6px}#asmDlg .row button{flex:1}#asmDlg input{width:90px}`;
+const st=document.createElement('style');st.textContent=css;document.head.append(st);
+const bar=document.createElement('div');bar.id='asmBar';
+bar.innerHTML='<b>ASSEMBLER</b><button data-a="placer" title="Ajouter une pièce à l\'assemblage">📥 Placer ▾</button><button data-a="cont" title="Coller une face d\'une pièce sur une face d\'une autre (avec un écart si voulu)">🔗 Contrainte</button><button data-a="tourner" title="Tourner les pièces sélectionnées de 90°">⟳ Tourner 90°</button><button data-a="fixer" title="Fixer : la pièce ne bouge plus (les autres s\'ajustent sur elle)">📌 Fixer</button><button data-a="grouper" title="Les pièces sélectionnées bougent ensemble comme un bloc">🧩 Grouper</button><button data-a="tout" title="Sélectionner toutes les pièces">☑ Tout</button><button data-a="aucun" title="Désélectionner">☐ Aucun</button><span class="n"></span>';
+view.append(bar);
+const ids=()=>sel=='multi'?selSet.slice():(selComp()?[selComp().id]:[]);
+function maj(){const n=ids().length;bar.querySelector('.n').textContent=n?(n+' sélectionnée'+(n>1?'s':'')+(n==1?' · Ctrl+clic pour en ajouter':' · glissez pour les déplacer ensemble')):(comps().length?'Cliquez une pièce · Ctrl+clic = plusieurs':'')}
+let arbreVu=false;const r0=rebuild;rebuild=function(){r0.apply(this,arguments);maj();if(!arbreVu&&comps().length>1&&WM.panels.tree&&WM.panels.tree.hidden){arbreVu=true;WM.panels.tree.hidden=false;WM.layout()}};
+function msg(t){$('info').textContent=t}
+const act={
+  placer(b){const r=b.getBoundingClientRect();DGMenu.show(r.left,r.bottom+4,[{head:'Placer une pièce'},
+    {icon:'🪵',label:'Bois de construction (2x4, 2x6, feuilles…)',action:()=>$('woodB').click()},
+    {icon:'📚',label:'Depuis la bibliothèque (glisser dans la vue)',action:()=>{const p=WM.panels.lib;if(p){p.hidden=false;p.min=false;WM.layout()}msg('📚 Glissez une pièce de la bibliothèque dans la vue 3D')}},
+    {icon:'📂',label:'Importer un fichier (STEP d\'Inventor, STL, OBJ…)',action:()=>$('impB').click()},
+    {icon:'⬆',label:'Nouvelle pièce par extrusion',action:()=>$('fExt').click()},
+    {icon:'⧉',label:'Copier la sélection (Ctrl+C puis Ctrl+V)',disabled:!ids().length,action:()=>{copySel(ids());msg('📋 Copié : faites Ctrl+V pour placer la copie')}}])},
+  cont(){if(comps().length<2){alert('Placez d\'abord au moins 2 pièces (📥 Placer).');return}ouvrir()},
+  tourner(){const L=[...new Set(ids().map(compOf).filter(Boolean).map(rootOf))].filter(c=>!isLocked(c));if(!L.length){msg('⟳ Sélectionnez d\'abord une pièce (non fixée)');return}snap();L.forEach(c=>c.ry=((c.ry||0)+90)%360);rebuild()},
+  fixer(){const L=ids().map(compOf).filter(Boolean);if(!L.length){msg('📌 Sélectionnez d\'abord la pièce à fixer');return}snap();const tous=L.every(c=>c.locked);L.forEach(c=>c.locked=!tous);rebuild();msg(tous?'📌 Pièce(s) libérée(s)':'📌 Pièce(s) fixée(s) : elles ne bougent plus')},
+  grouper(){if(ids().length<2){msg('🧩 Sélectionnez au moins 2 pièces (Ctrl+clic ou cases de l\'arbre)');return}sel='multi';rebuild();$('mF')&&$('mF').click()},
+  tout(){const L=comps().filter(c=>rootOf(c)===c).map(c=>c.id);if(!L.length)return;selSet=L;sel=L.length>1?'multi':'c'+L[0];if(L.length==1)selSet=[];rebuild()},
+  aucun(){sel=null;selSet=[];rebuild()}};
+bar.onclick=e=>{const b=e.target.closest('button');if(b&&act[b.dataset.a])act[b.dataset.a](b)};
+// fenêtre de contrainte guidée
+let dlg=null,dernier=null;
+const TYPES=[['mate','⬛⬛','Face contre face','les deux faces se touchent'],['align','▭▭','Affleurement','les faces sont alignées côte à côte']];
+function ouvrir(){fermer(false);window.ASM_TYPE=window.ASM_TYPE||'mate';window.ASM_OFF=0;dernier=null;
+  dlg=document.createElement('div');dlg.id='asmDlg';
+  dlg.innerHTML='<b>🔗 Contrainte</b><div class="ty">'+TYPES.map(t=>'<button data-t="'+t[0]+'"><span style="font-size:18px">'+t[1]+'</span><b>'+t[2]+'</b><small style="color:#9aa0ab">'+t[3]+'</small></button>').join('')+'</div>'
+   +'<div class="st s1">① Cliquez une face de la pièce qui doit BOUGER</div><div class="st s2">② Cliquez la face de RÉFÉRENCE sur l\'autre pièce</div>'
+   +'<label>Écart <input class="of" type="number" step="1" value="0"> mm</label><div class="row"><button data-x="inv">⇅ Inverser</button><button data-x="enc">＋ Encore une</button></div><div class="row"><button data-x="ok" style="background:#3d8bff;border-color:#3d8bff;color:#fff">✔ OK</button><button data-x="ann">✖ Annuler</button></div>';
+  view.append(dlg);const of=dlg.querySelector('.of');of.onkeydown=e=>e.stopPropagation();
+  of.oninput=()=>{window.ASM_OFF=+of.value||0;if(dernier){dernier.off=window.ASM_OFF;rebuild()}};
+  const majT=()=>dlg.querySelectorAll('[data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t==window.ASM_TYPE));majT();
+  dlg.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.t){window.ASM_TYPE=b.dataset.t;majT();if(dernier){dernier.type=b.dataset.t;rebuild()}return}
+    const x=b.dataset.x;if(x=='inv'){if(dernier){dernier.flip=!dernier.flip;rebuild()}else msg('⇅ Faites d\'abord la contrainte')}
+    if(x=='enc'){dernier=null;of.value=0;window.ASM_OFF=0;depart()}if(x=='ok')fermer(false);if(x=='ann')fermer(true)};
+  depart()}
+function depart(){if(!consPick)startCons();asmEtape(1)}
+window.asmEtape=n=>{if(!dlg)return;dlg.querySelector('.s1').className='st s1 '+(n==1?'cur':'ok');dlg.querySelector('.s2').className='st s2 '+(n==2?'cur':n>2?'ok':'')};
+window.asmApres=k=>{if(!dlg)return;dernier=k;asmEtape(3);msg('🔗 Contrainte posée. Changez le type, l\'écart ou ⇅ Inverser, puis ✔ OK (ou ＋ Encore une)')};
+function fermer(annuler){if(consPick){consPick=0;consA=null;$('consB').classList.remove('on')}if(annuler&&dernier){const i=cons().indexOf(dernier);if(i>=0){snap();cons().splice(i,1)}}
+  dernier=null;if(dlg){dlg.remove();dlg=null}rebuild()}
+$('consB').onclick=()=>dlg?fermer(false):act.cont();
+addEventListener('keydown',e=>{if(e.key=='Escape'&&dlg)fermer(!!0)},true);
+window.ASM={act,ouvrir,fermer,ids};maj();
+})();
 resize();if(/[?&]plan=1/.test(location.search)&&buildHouse(readPlan())){M.showPlan=true}syncPlan(true);
 </script>
 </body>
